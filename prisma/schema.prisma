@@ -6,3 +6,70 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
 }
+
+enum Role {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(SCHOOL_ADMIN)
+  school    School?  @relation("SchoolOwner")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Plan {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  description   String?
+  price         Float          @default(0)
+  maxStudents   Int            @default(50)
+  maxTeachers   Int            @default(10)
+  allowReports  Boolean        @default(false)
+  storageLimit  Int            @default(100)
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  schoolId  String   @unique
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id])
+  startDate DateTime @default(now())
+  endDate   DateTime
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model School {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  slug         String        @unique
+  logo         String?
+  address      String?
+  phone        String?
+  ownerId      String        @unique
+  owner        User          @relation("SchoolOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  subscription Subscription?
+  students     Student[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Student {
+  id        String   @id @default(uuid())
+  name      String
+  age       Int
+  email     String?
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
