@@ -7,15 +7,27 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 enum Role {
   SUPER_ADMIN
   SCHOOL_ADMIN
+  ASSISTANT
+  TEACHER
+  STUDENT
 }
 
 model User {
   id        String   @id @default(uuid())
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
   email     String   @unique
   password  String
+  gender    Gender
+  birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)
   school    School?  @relation("SchoolOwner")
   createdAt DateTime @default(now())
@@ -35,6 +47,12 @@ model Plan {
   createdAt     DateTime       @default(now())
 }
 
+enum Status {
+  ACTIVE
+  PENDING
+  EXPIRED
+}
+
 model Subscription {
   id        String   @id @default(uuid())
   schoolId  String   @unique
@@ -43,7 +61,7 @@ model Subscription {
   plan      Plan     @relation(fields: [planId], references: [id])
   startDate DateTime @default(now())
   endDate   DateTime
-  status    String   @default("ACTIVE")
+  status    Status   @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
