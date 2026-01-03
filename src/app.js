@@ -5,11 +5,5 @@ const app = express();
 app.use(express.json());
 
 // Routes 
-app.get('/', (req, res) => {
-  res.json({
-    message: "Welcome to Schools Management API",
-    status: "Running"
-  });
-});
-
+app.use('/api/auth', require('./routes/authRoutes'));
 module.exports = app;
