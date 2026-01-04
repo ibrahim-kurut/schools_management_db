@@ -20,18 +20,52 @@ enum Role {
   STUDENT
 }
 
+enum Status {
+  ACTIVE
+  PENDING
+  EXPIRED
+}
+
 model User {
   id        String   @id @default(uuid())
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
   email     String   @unique
+  phone     String?
   password  String
   gender    Gender
   birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)
-  school    School?  @relation("SchoolOwner")
+
+  // 1. علاقة الانتساب لمدرسة (للكادر والطلاب)
+  schoolId String?
+  school   School? @relation("SchoolMembers", fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // 2. علاقة الملكية (للمدير فقط)
+  ownedSchool School? @relation("SchoolOwner")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model School {
+  id      String  @id @default(uuid())
+  name    String  @unique
+  slug    String  @unique
+  logo    String?
+  address String?
+  phone   String?
+
+  // ربط المدير بالمدرسة
+  ownerId String @unique
+  owner   User   @relation("SchoolOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // ربط جميع أعضاء المدرسة (طلاب، معلمين، معاونين)
+  members User[] @relation("SchoolMembers")
+
+  subscription Subscription?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Plan {
@@ -47,12 +81,6 @@ model Plan {
   createdAt     DateTime       @default(now())
 }
 
-enum Status {
-  ACTIVE
-  PENDING
-  EXPIRED
-}
-
 model Subscription {
   id        String   @id @default(uuid())
   schoolId  String   @unique
@@ -62,32 +90,6 @@ model Subscription {
   startDate DateTime @default(now())
   endDate   DateTime
   status    Status   @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model School {
-  id           String        @id @default(uuid())
-  name         String        @unique
-  slug         String        @unique
-  logo         String?
-  address      String?
-  phone        String?
-  ownerId      String        @unique
-  owner        User          @relation("SchoolOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  subscription Subscription?
-  students     Student[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-}
-
-model Student {
-  id        String   @id @default(uuid())
-  name      String
-  age       Int
-  email     String?
-  schoolId  String
-  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

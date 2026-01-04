@@ -5,6 +5,7 @@ const createUserSchema = Joi.object({
     lastName: Joi.string().required(),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
+    phone: Joi.string().required(),
     gender: Joi.string().valid('MALE', 'FEMALE').required(),
     birthDate: Joi.date().required(),
 });
