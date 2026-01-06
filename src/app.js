@@ -6,4 +6,5 @@ app.use(express.json());
 
 // Routes 
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/plans', require('./routes/planRoutes'));
 module.exports = app;
