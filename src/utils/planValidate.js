@@ -11,6 +11,17 @@ const createPlanSchema = Joi.object({
     allowReports: Joi.boolean().default(false),
 });
 
+const updatePlanSchema = Joi.object({
+    name: Joi.string().trim(),
+    description: Joi.string().trim(),
+    price: Joi.number().min(0),
+    maxStudents: Joi.number().integer().min(0),
+    maxTeachers: Joi.number().integer().min(0),
+    storageLimit: Joi.number().integer().min(0),
+    allowReports: Joi.boolean(),
+});
+
 module.exports = {
     createPlanSchema,
+    updatePlanSchema,
 };

@@ -38,3 +38,43 @@ exports.getAllPlans = async () => {
     //2. Return the plans
     return plans;
 };
+
+/**
+ * @description Get plan by id
+ * @route GET /api/plans/:id
+ * @method GET
+ * @access private
+ */
+exports.getPlanById = async (id) => {
+    //1. Get the plan by id
+    const plan = await prisma.plan.findUnique({
+        where: { id: id }
+    });
+    //2. Return the plan
+    return plan;
+};
+
+/**
+ * @description Update plan by id
+ * @route PUT /api/plans/:id
+ * @method PUT
+ * @access private
+ */
+exports.updatePlanById = async (id, planData) => {
+    //1. Get the plan by id
+    const plan = await prisma.plan.findUnique({
+        where: { id: id }
+    });
+    //2. If the plan does not exist, throw an error.
+    if (!plan) {
+        throw new Error("Plan not found");
+    }
+    //3. Update the plan
+    const updatedPlan = await prisma.plan.update({
+        where: { id: id },
+        data: planData
+    });
+    //4. Return the updated plan
+    return updatedPlan;
+};
+
