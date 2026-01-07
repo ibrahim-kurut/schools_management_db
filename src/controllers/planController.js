@@ -132,3 +132,35 @@ exports.updatePlanById = async (req, res) => {
     }
 };
 
+/**
+ * @description delete plan
+ * @route DELETE /api/plans/:id
+ * @method DELETE
+ * @access private (Super Admin only)
+ */
+exports.deletePlan = async (req, res) => {
+    try {
+        // 1. validate id
+        const { error, value } = validateId(req.params.id);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
+        // 2. Delete the plan
+        const deletedPlan = await planService.deletePlan(value.id);
+
+        // 3. Return the response
+        res.status(200).json({
+            message: "Plan deleted successfully",
+            plan: deletedPlan
+        });
+    } catch (error) {
+        console.error("Delete Plan Error:", error);
+
+        if (error.message === "Plan not found") {
+            return res.status(404).json({ message: error.message });
+        }
+
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};

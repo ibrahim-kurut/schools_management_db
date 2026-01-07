@@ -78,3 +78,25 @@ exports.updatePlanById = async (id, planData) => {
     return updatedPlan;
 };
 
+/**
+ * @description delete plan
+ * @route DELETE /api/plans/:id
+ * @method DELETE
+ * @access private (Super Admin only)
+ */
+exports.deletePlan = async (id) => {
+    //1. Get the plan by id
+    const plan = await prisma.plan.findUnique({
+        where: { id: id }
+    });
+    //2. If the plan does not exist, throw an error.
+    if (!plan) {
+        throw new Error("Plan not found");
+    }
+    //3. Delete the plan
+    const deletedPlan = await prisma.plan.delete({
+        where: { id: id }
+    });
+    //4. Return the deleted plan
+    return deletedPlan;
+};
