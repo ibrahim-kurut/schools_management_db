@@ -25,3 +25,16 @@ exports.createPlan = async (planData) => {
     //4. Return the new plan
     return newPlan;
 };
+
+/**
+ * @description Get all plans
+ * @route GET /api/plans
+ * @method GET
+ * @access private
+ */
+exports.getAllPlans = async () => {
+    //1. Get all plans
+    const plans = await prisma.plan.findMany();
+    //2. Return the plans
+    return plans;
+};

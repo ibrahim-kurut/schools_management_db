@@ -37,3 +37,25 @@ exports.createPlan = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+/**
+ * @description Get all plans
+ * @route GET /api/plans
+ * @method GET
+ * @access private (Super Admin only)
+ */
+exports.getAllPlans = async (req, res) => {
+    try {
+        // 1. Call the service to get all plans
+        const plans = await planService.getAllPlans();
+
+        // 2. Return the response
+        res.status(200).json({
+            message: "Plans retrieved successfully",
+            plans: plans
+        });
+    } catch (error) {
+        console.error("Get Plans Error:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
