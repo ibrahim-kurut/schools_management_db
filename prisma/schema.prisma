@@ -69,16 +69,17 @@ model School {
 }
 
 model Plan {
-  id            String         @id @default(uuid())
-  name          String         @unique
-  description   String?
-  price         Float          @default(0)
-  maxStudents   Int            @default(50)
-  maxTeachers   Int            @default(10)
-  allowReports  Boolean        @default(false)
-  storageLimit  Int            @default(100)
-  subscriptions Subscription[]
-  createdAt     DateTime       @default(now())
+  id             String         @id @default(uuid())
+  name           String         @unique
+  description    String?
+  price          Float          @default(0)
+  maxStudents    Int            @default(50)
+  maxTeachers    Int            @default(10)
+  allowReports   Boolean        @default(false)
+  storageLimit   Int            @default(100)
+  durationInDays Int            @default(30)
+  subscriptions  Subscription[]
+  createdAt      DateTime       @default(now())
 }
 
 model Subscription {
