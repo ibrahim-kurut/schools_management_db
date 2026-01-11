@@ -98,15 +98,39 @@ exports.createSchoolService = async (schoolData) => {
  * @method GET
  * @access private
  */
-exports.getAllSchoolsService = async () => {
-    const schools = await prisma.school.findMany({
-        include: {
-            subscription: {
-                include: {
-                    plan: true,
+exports.getAllSchoolsService = async (page, limit) => {
+    // 1. Counting the number of items we skip
+    const skip = (page - 1) * limit;
+
+    // 2. Fetching data with total count
+    const [schools, totleSchools] = await Promise.all([
+        prisma.school.findMany({
+            skip: skip,
+            take: limit,
+            include: {
+                subscription: {
+                    include: {
+                        plan: true,
+                    },
                 },
             },
-        }
-    });
-    return schools;
+            orderBy: {
+                createdAt: 'desc' // Sorting from latest to oldest
+            }
+        }),
+        prisma.school.count() // Total count of schools
+    ]);
+
+    // 3. Calculating total pages
+    const totalPages = Math.ceil(totleSchools / limit);
+
+    // 4. Returning data with pagination info
+    return {
+        schools,
+        currentPage: page,
+        totalPages,
+        totleSchools,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+    };
 }

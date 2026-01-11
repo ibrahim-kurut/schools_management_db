@@ -52,11 +52,31 @@ exports.createSchool = async (req, res) => {
 
 exports.getAllSchools = async (req, res) => {
     try {
-        const schools = await getAllSchoolsService();
-        if (!schools) {
+        // 1. Extracting page and limit from query parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        // 2. Passing values to Service
+        const result = await getAllSchoolsService(page, limit);
+
+        // 3. Checking if schools exist
+        if (!result.schools || result.schools.length === 0) {
             return res.status(404).json({ message: "No schools found" });
         }
-        res.status(200).json({ message: "Schools retrieved successfully", schools });
+
+        // 4. Sending data with pagination info
+        res.status(200).json({
+            message: "Schools retrieved successfully",
+            schools: result.schools,
+            pagination: {
+                currentPage: result.currentPage,
+                totalPages: result.totalPages,
+                totleSchools: result.totleSchools,
+                itemsPerPage: limit,
+                hasNextPage: result.hasNextPage,
+                hasPreviousPage: result.hasPreviousPage
+            }
+        });
     } catch (error) {
         console.log("Get all schools error:", error);
         res.status(500).json({ message: "Internal Server Error" });
