@@ -91,3 +91,22 @@ exports.createSchoolService = async (schoolData) => {
     // 5. return school
     return newSchool;
 }
+
+/**
+ * @description Get a school all schools
+ * @route GET /api/schools
+ * @method GET
+ * @access private
+ */
+exports.getAllSchoolsService = async () => {
+    const schools = await prisma.school.findMany({
+        include: {
+            subscription: {
+                include: {
+                    plan: true,
+                },
+            },
+        }
+    });
+    return schools;
+}

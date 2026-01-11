@@ -1,4 +1,4 @@
-const { createSchoolService } = require("../services/schoolsService");
+const { createSchoolService, getAllSchoolsService } = require("../services/schoolsService");
 const { createSchoolSchema } = require("../utils/schoolValidate");
 
 
@@ -39,6 +39,26 @@ exports.createSchool = async (req, res) => {
             return res.status(400).json({ message: "You already own a school. Each admin can own only one school." });
         }
 
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
+/**
+ * @description Get all schools
+ * @route GET /api/schools
+ * @method GET
+ * @access private (super admin only)
+ */
+
+exports.getAllSchools = async (req, res) => {
+    try {
+        const schools = await getAllSchoolsService();
+        if (!schools) {
+            return res.status(404).json({ message: "No schools found" });
+        }
+        res.status(200).json({ message: "Schools retrieved successfully", schools });
+    } catch (error) {
+        console.log("Get all schools error:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
