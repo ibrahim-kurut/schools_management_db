@@ -98,13 +98,19 @@ exports.createSchoolService = async (schoolData) => {
  * @method GET
  * @access private
  */
-exports.getAllSchoolsService = async (page, limit) => {
+exports.getAllSchoolsService = async (page, limit, searchWord) => {
     // 1. Counting the number of items we skip
     const skip = (page - 1) * limit;
 
     // 2. Fetching data with total count
     const [schools, totleSchools] = await Promise.all([
         prisma.school.findMany({
+            where: searchWord ? {
+                name: {
+                    contains: searchWord,
+                    mode: 'insensitive',
+                }
+            } : {},
             skip: skip,
             take: limit,
             include: {
@@ -118,7 +124,14 @@ exports.getAllSchoolsService = async (page, limit) => {
                 createdAt: 'desc' // Sorting from latest to oldest
             }
         }),
-        prisma.school.count() // Total count of schools
+        prisma.school.count({
+            where: searchWord ? {
+                name: {
+                    contains: searchWord,
+                    mode: 'insensitive',
+                }
+            } : {},
+        }) // Total count of schools
     ]);
 
     // 3. Calculating total pages

@@ -51,13 +51,19 @@ exports.createSchool = async (req, res) => {
  */
 
 exports.getAllSchools = async (req, res) => {
+
+
+    const searchWord = req.query.search || "";
+    console.log("searchWord ...........", searchWord);
+
+
     try {
         // 1. Extracting page and limit from query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
 
         // 2. Passing values to Service
-        const result = await getAllSchoolsService(page, limit);
+        const result = await getAllSchoolsService(page, limit, searchWord);
 
         // 3. Checking if schools exist
         if (!result.schools || result.schools.length === 0) {
