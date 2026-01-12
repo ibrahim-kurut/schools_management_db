@@ -147,3 +147,26 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
         hasPreviousPage: page > 1
     };
 }
+/**
+ * @description Get a school by id
+ * @route GET /api/schools/:id
+ * @method GET
+ * @access private
+ */
+exports.getSchoolByIdService = async (id) => {
+    // 1. Fetching school by id
+    const school = await prisma.school.findUnique({
+        where: {
+            id: id
+        },
+        include: {
+            subscription: {
+                include: {
+                    plan: true,
+                },
+            },
+        }
+    });
+    // 2. Returning school
+    return school;
+}

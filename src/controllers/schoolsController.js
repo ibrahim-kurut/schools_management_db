@@ -1,4 +1,4 @@
-const { createSchoolService, getAllSchoolsService } = require("../services/schoolsService");
+const { createSchoolService, getAllSchoolsService, getSchoolByIdService } = require("../services/schoolsService");
 const { createSchoolSchema } = require("../utils/schoolValidate");
 
 
@@ -54,7 +54,7 @@ exports.getAllSchools = async (req, res) => {
 
 
     const searchWord = req.query.search || "";
-    console.log("searchWord ...........", searchWord);
+
 
 
     try {
@@ -88,3 +88,31 @@ exports.getAllSchools = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
+
+/**
+ * @description Get school by id
+ * @route GET /api/schools/:id
+ * @method GET
+ * @access private (super admin only)
+ */
+exports.getSchoolById = async (req, res) => {
+    try {
+        // 1. Extracting school id from params
+        const id = req.params.id;
+
+        // 2. Passing values to Service
+        const school = await getSchoolByIdService(id);
+
+        // 3. Checking if school exists
+        if (!school) {
+            return res.status(404).json({ message: "School not found" });
+        }
+
+        // 4. Sending data
+        res.status(200).json({ message: "School retrieved successfully", school });
+    } catch (error) {
+        console.log("Get school by id error:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
