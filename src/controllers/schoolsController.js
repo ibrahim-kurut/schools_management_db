@@ -93,15 +93,18 @@ exports.getAllSchools = async (req, res) => {
  * @description Get school by id
  * @route GET /api/schools/:id
  * @method GET
- * @access private (super admin only)
+ * @access private (get school by id only owner or super admin)
  */
 exports.getSchoolById = async (req, res) => {
     try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
         // 1. Extracting school id from params
         const id = req.params.id;
 
         // 2. Passing values to Service
-        const school = await getSchoolByIdService(id);
+        const school = await getSchoolByIdService(id, userId, userRole);
 
         // 3. Checking if school exists
         if (!school) {
@@ -112,6 +115,12 @@ exports.getSchoolById = async (req, res) => {
         res.status(200).json({ message: "School retrieved successfully", school });
     } catch (error) {
         console.log("Get school by id error:", error);
+
+        // Handle authorization error
+        if (error.message === "FORBIDDEN") {
+            return res.status(403).json({ message: "You are not authorized to access this school" });
+        }
+
         res.status(500).json({ message: "Internal Server Error" });
     }
 }

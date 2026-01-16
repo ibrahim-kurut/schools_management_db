@@ -153,7 +153,8 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
  * @method GET
  * @access private
  */
-exports.getSchoolByIdService = async (id) => {
+exports.getSchoolByIdService = async (id, userId, userRole) => {
+
     // 1. Fetching school by id
     const school = await prisma.school.findUnique({
         where: {
@@ -167,6 +168,17 @@ exports.getSchoolByIdService = async (id) => {
             },
         }
     });
-    // 2. Returning school
+
+    // 2. Check if school exists
+    if (!school) {
+        return null;
+    }
+
+    // 3. Authorization check: Only owner or SUPER_ADMIN can access
+    if (userId !== school.ownerId && userRole !== "SUPER_ADMIN") {
+        throw new Error("FORBIDDEN");
+    }
+
+    // 4. Returning school
     return school;
 }
