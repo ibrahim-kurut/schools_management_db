@@ -1,5 +1,6 @@
-const { createSchoolService, getAllSchoolsService, getSchoolByIdService } = require("../services/schoolsService");
-const { createSchoolSchema } = require("../utils/schoolValidate");
+const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateSchoolByIdService } = require("../services/schoolsService");
+const { createSchoolSchema, updateSchoolSchema } = require("../utils/schoolValidate");
+const { validateId } = require("../utils/validateUUID");
 
 
 /**
@@ -101,10 +102,15 @@ exports.getSchoolById = async (req, res) => {
         const userRole = req.user.role;
 
         // 1. Extracting school id from params
-        const id = req.params.id;
+        const { error: IdError, value: IdValue } = validateId(req.params.id);
+        if (IdError) {
+            return res.status(400).json({ message: IdError.details[0].message });
+        }
+
+
 
         // 2. Passing values to Service
-        const school = await getSchoolByIdService(id, userId, userRole);
+        const school = await getSchoolByIdService(IdValue.id, userId, userRole);
 
         // 3. Checking if school exists
         if (!school) {
@@ -125,3 +131,65 @@ exports.getSchoolById = async (req, res) => {
     }
 }
 
+
+/**
+ * @description Update school by id
+ * @route PUT /api/schools/:id
+ * @method PUT
+ * @access private (update school by id only owner or super admin)
+ */
+exports.updateSchoolById = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        // 1. Extracting school id from params
+        const { error: IdError, value: IdValue } = validateId(req.params.id);
+        if (IdError) {
+            return res.status(400).json({ message: IdError.details[0].message });
+        }
+
+        // 2. validate data
+        const { error, value } = updateSchoolSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
+        // 3. Passing data to Service
+        const school = await updateSchoolByIdService(IdValue.id, value, userId, userRole);
+
+        // 4. Checking if school exists
+        if (!school) {
+            return res.status(404).json({ message: "School not found" });
+        }
+
+        // 5. A warning message  if not a changes slug name
+        let slugNameWarning = null;
+
+        if (value.name && !value.slug) {
+            // The user changed the name but did not send the slug.
+            slugNameWarning = "School name updated but slug name unchanged. Update slug if needed";
+        } else if (value.name && value.slug) {
+            // The user sent both name and slug. Check if they match.
+            const expectedSlug = value.name.toLowerCase().replace(/ /g, '-');
+            if (expectedSlug !== value.slug.toLowerCase()) {
+                slugNameWarning = "Name and slug do not match. This may cause confusion.";
+            }
+        }
+        // 6. Sending data with optional warning
+        res.status(200).json({
+            message: "School updated successfully",
+            school,
+            ...(slugNameWarning && { slugNameWarning })
+        });
+    } catch (error) {
+        console.log("Update school by id error:", error);
+
+        // Handle authorization error
+        if (error.message === "FORBIDDEN") {
+            return res.status(403).json({ message: "You are not authorized to access this school" });
+        }
+
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}

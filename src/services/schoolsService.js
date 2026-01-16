@@ -182,3 +182,49 @@ exports.getSchoolByIdService = async (id, userId, userRole) => {
     // 4. Returning school
     return school;
 }
+
+/**
+ * @description Update a school by id
+ * @route PUT /api/schools/:id
+ * @method PUT
+ * @access private (owner or super admin)
+ */
+exports.updateSchoolByIdService = async (id, schoolData, userId, userRole) => {
+    // 1. Fetching school by id
+    const school = await prisma.school.findUnique({
+        where: {
+            id: id
+        }
+    });
+
+    // 2. Check if school exists
+    if (!school) {
+        return null;
+    }
+
+    // 3. Authorization check: Only owner or SUPER_ADMIN can access
+    if (userId !== school.ownerId && userRole !== "SUPER_ADMIN") {
+        throw new Error("FORBIDDEN");
+    }
+
+    // 4. Normalize slug if provided
+    if (schoolData.slug) {
+        schoolData.slug = schoolData.slug.toLowerCase().replace(/ /g, '-');
+    }
+
+    // 5. Prevent SCHOOL_ADMIN from changing planId (only SUPER_ADMIN can)
+    if (schoolData.planId && userRole !== "SUPER_ADMIN") {
+        delete schoolData.planId;
+    }
+
+    // 6. Updating school
+    const updatedSchool = await prisma.school.update({
+        where: {
+            id: id
+        },
+        data: schoolData
+    });
+
+    // 7. Returning updated school
+    return updatedSchool;
+}
