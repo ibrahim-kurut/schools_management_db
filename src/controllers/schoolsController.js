@@ -1,4 +1,4 @@
-const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateSchoolByIdService } = require("../services/schoolsService");
+const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateSchoolByIdService, deleteSchoolByIdService } = require("../services/schoolsService");
 const { createSchoolSchema, updateSchoolSchema } = require("../utils/schoolValidate");
 const { validateId } = require("../utils/validateUUID");
 
@@ -193,3 +193,43 @@ exports.updateSchoolById = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
+
+/**
+ * @description Delete school by id
+ * @route DELETE /api/schools/:id
+ * @method DELETE
+ * @access private (delete school by id only owner or super admin)
+ */
+exports.deleteSchoolById = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        // 1. Extracting school id from params
+        const { error: IdError, value: IdValue } = validateId(req.params.id);
+        if (IdError) {
+            return res.status(400).json({ message: IdError.details[0].message });
+        }
+
+        // 2. Passing values to Service
+        const school = await deleteSchoolByIdService(IdValue.id, userId, userRole);
+
+        // 3. Checking if school exists
+        if (!school) {
+            return res.status(404).json({ message: "School not found" });
+        }
+
+        // 4. Sending data
+        res.status(200).json({ message: "School deleted successfully", school });
+    } catch (error) {
+        console.log("Delete school by id error:", error);
+
+        // Handle authorization error
+        if (error.message === "FORBIDDEN") {
+            return res.status(403).json({ message: "You are not authorized to access this school" });
+        }
+
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+

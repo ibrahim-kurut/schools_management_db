@@ -228,3 +228,39 @@ exports.updateSchoolByIdService = async (id, schoolData, userId, userRole) => {
     // 7. Returning updated school
     return updatedSchool;
 }
+
+
+/**
+ * @description Delete a school by id
+ * @route DELETE /api/schools/:id
+ * @method DELETE
+ * @access private (owner or super admin)
+ */
+exports.deleteSchoolByIdService = async (id, userId, userRole) => {
+    // 1. Fetching school by id
+    const school = await prisma.school.findUnique({
+        where: {
+            id: id
+        }
+    });
+
+    // 2. Check if school exists
+    if (!school) {
+        return null;
+    }
+
+    // 3. Authorization check: Only owner or SUPER_ADMIN can access
+    if (userId !== school.ownerId && userRole !== "SUPER_ADMIN") {
+        throw new Error("FORBIDDEN");
+    }
+
+    // 4. Deleting school
+    const deletedSchool = await prisma.school.delete({
+        where: {
+            id: id
+        }
+    });
+
+    // 5. Returning deleted school
+    return deletedSchool;
+}
