@@ -58,9 +58,10 @@ exports.getAllMembersController = async (req, res) => {
         // 1. Extracting page and limit from query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
+        const searchWord = req.query.search || "";
 
         // 2. Passing values to Service
-        const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit);
+        const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord);
 
         res.status(200).json({
             message: "Members fetched successfully",

@@ -89,7 +89,7 @@ exports.addMemberService = async (requesterId, memberData) => {
  * @access private (school owner)
  */
 
-exports.getAllMembersService = async (requesterId, page, limit) => {
+exports.getAllMembersService = async (requesterId, page, limit, searchWord) => {
     try {
         const skip = (page - 1) * limit;
 
@@ -105,12 +105,24 @@ exports.getAllMembersService = async (requesterId, page, limit) => {
 
         // 2. Get Total Count of Members (for Pagination)
         const totalMembers = await prisma.user.count({
-            where: { schoolId: school.id }
+            where: {
+                schoolId: school.id,
+                OR: [
+                    { firstName: { contains: searchWord, mode: 'insensitive' } },
+                    { lastName: { contains: searchWord, mode: 'insensitive' } }
+                ]
+            }
         });
 
         // 3. Get Members for Current Page
         const members = await prisma.user.findMany({
-            where: { schoolId: school.id },
+            where: {
+                schoolId: school.id,
+                OR: [
+                    { firstName: { contains: searchWord, mode: 'insensitive' } },
+                    { lastName: { contains: searchWord, mode: 'insensitive' } }
+                ]
+            },
             skip: skip,
             take: limit,
             orderBy: { createdAt: 'desc' },
