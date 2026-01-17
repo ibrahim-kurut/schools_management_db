@@ -55,14 +55,25 @@ exports.addMemberController = async (req, res) => {
 exports.getAllMembersController = async (req, res) => {
     try {
 
+        // 1. Extracting page and limit from query parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
 
-
-        // 1. Passing values to Service
-        const result = await getAllMembersService(req.user.id);
+        // 2. Passing values to Service
+        const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit);
 
         res.status(200).json({
             message: "Members fetched successfully",
-            result,
+            school,
+            members,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalMembers / limit),
+                totalMembers: totalMembers,
+                itemsPerPage: limit,
+                hasNextPage: page < Math.ceil(totalMembers / limit),
+                hasPreviousPage: page > 1
+            }
         });
     } catch (error) {
         console.log("Error in getAllMembersController:", error);

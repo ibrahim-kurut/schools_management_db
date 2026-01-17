@@ -89,44 +89,51 @@ exports.addMemberService = async (requesterId, memberData) => {
  * @access private (school owner)
  */
 
-exports.getAllMembersService = async (requesterId) => {
+exports.getAllMembersService = async (requesterId, page, limit) => {
     try {
+        const skip = (page - 1) * limit;
+
+        // 1. Get School Basic Info
         const school = await prisma.school.findUnique({
             where: { ownerId: requesterId },
-            include: {
-                members: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        email: true,
-                        phone: true,
-                        gender: true,
-                        birthDate: true,
-                        role: true,
-                        schoolId: true,
-                        createdAt: true,
-                        // password: false // excluded explicitly by not selecting it
-                    },
-                    orderBy: {
-                        createdAt: 'desc'
-                    },
-                }
-            },
+            select: { id: true, name: true, slug: true, logo: true }
         });
+
         if (!school) {
             throw new Error("School not found for this user");
         }
 
+        // 2. Get Total Count of Members (for Pagination)
+        const totalMembers = await prisma.user.count({
+            where: { schoolId: school.id }
+        });
+
+        // 3. Get Members for Current Page
+        const members = await prisma.user.findMany({
+            where: { schoolId: school.id },
+            skip: skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                gender: true,
+                birthDate: true,
+                role: true,
+                schoolId: true,
+                createdAt: true,
+            }
+        });
+
         return {
-            school: {
-                id: school.id,
-                name: school.name,
-                slug: school.slug,
-                logo: school.logo
-            },
-            members: school.members
+            school,
+            members,
+            totalMembers
         };
+
     } catch (error) {
         throw error;
     }
