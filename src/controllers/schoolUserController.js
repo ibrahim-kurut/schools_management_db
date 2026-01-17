@@ -1,9 +1,9 @@
-const { addMemberService } = require("../services/schoolUserService");
+const { addMemberService, getAllMembersService } = require("../services/schoolUserService");
 const { addSchoolMemberSchema } = require("../utils/schoolUserValidate");
 
 /**
  * @description Add a new member to a school
- * @route POST /api/school-user/add-member
+ * @route POST /api/school-user/
  * @method POST
  * @access private (school owner)
  */
@@ -45,3 +45,28 @@ exports.addMemberController = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+/**
+ * @description  Get all members of a school
+ * @route GET /api/school-user
+ * @method GET
+ * @access private (school owner)
+ */
+exports.getAllMembersController = async (req, res) => {
+    try {
+
+
+
+        // 1. Passing values to Service
+        const result = await getAllMembersService(req.user.id);
+
+        res.status(200).json({
+            message: "Members fetched successfully",
+            result,
+        });
+    } catch (error) {
+        console.log("Error in getAllMembersController:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+

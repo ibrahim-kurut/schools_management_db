@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { addMemberController } = require('../controllers/schoolUserController');
+const { addMemberController, getAllMembersController } = require('../controllers/schoolUserController');
 const { verifyToken, authorize } = require('../middleware/verifyToken');
 
 
 
-router.post('/add-member', verifyToken, authorize(['SCHOOL_ADMIN']), addMemberController);
+router.post('/', verifyToken, authorize(['SCHOOL_ADMIN']), addMemberController);
+router.get('/', verifyToken, authorize(['SCHOOL_ADMIN']), getAllMembersController);
 
 
-module.exports = router;
+module.exports = router

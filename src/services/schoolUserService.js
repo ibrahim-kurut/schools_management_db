@@ -3,7 +3,7 @@ const { hashPassword } = require("../utils/auth");
 
 /**
  * @description Add a new member to a school
- * @route POST /api/school-user/add-member
+ * @route POST /api/school-user
  * @method POST
  * @access private (school owner)
  */
@@ -81,3 +81,66 @@ exports.addMemberService = async (requesterId, memberData) => {
         throw error;
     }
 };
+
+/**
+ * @description  Get all members of a school
+ * @route GET /api/school-user
+ * @method GET
+ * @access private (school owner)
+ */
+
+exports.getAllMembersService = async (requesterId) => {
+    try {
+        const school = await prisma.school.findUnique({
+            where: { ownerId: requesterId },
+            include: {
+                members: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                        gender: true,
+                        birthDate: true,
+                        role: true,
+                        schoolId: true,
+                        createdAt: true,
+                        // password: false // excluded explicitly by not selecting it
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    },
+                }
+            },
+        });
+        if (!school) {
+            throw new Error("School not found for this user");
+        }
+
+        return {
+            school: {
+                id: school.id,
+                name: school.name,
+                slug: school.slug,
+                logo: school.logo
+            },
+            members: school.members
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+
+
+
+
+
+
+//*! TODO
+/**
+ *?
+ *? Get a specific member by ID
+ *? Update a member
+ *? Delete a member
+ */
