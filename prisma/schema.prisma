@@ -7,6 +7,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// --------------------------------------
+// Enums
+// --------------------------------------
+
 enum Gender {
   MALE
   FEMALE
@@ -15,6 +19,7 @@ enum Gender {
 enum Role {
   SUPER_ADMIN
   SCHOOL_ADMIN
+  ACCOUNTANT // New Role
   ASSISTANT
   TEACHER
   STUDENT
@@ -25,6 +30,24 @@ enum Status {
   PENDING
   EXPIRED
 }
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum ExpenseType {
+  SALARY
+  MAINTENANCE
+  SUPPLIES
+  OTHER
+}
+
+// --------------------------------------
+// Core Models
+// --------------------------------------
 
 model User {
   id        String   @id @default(uuid())
@@ -37,12 +60,33 @@ model User {
   birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)
 
-  // 1. علاقة الانتساب لمدرسة (للكادر والطلاب)
+  // --- Relations ---
+
+  // 1. School Membership
   schoolId String?
   school   School? @relation("SchoolMembers", fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // 2. علاقة الملكية (للمدير فقط)
+  // 2. School Ownership
   ownedSchool School? @relation("SchoolOwner")
+
+  // 3. Academic (Student)
+  classId String?
+  class   Class?  @relation("ClassStudents", fields: [classId], references: [id])
+
+  // 4. Academic (Teacher)
+  subjects Subject[] @relation("TeacherSubjects")
+  notes    Note[]    @relation("TeacherNotes")
+
+  // 5. Financial (Student)
+  paymentsMade Payment[] @relation("StudentPayments")
+
+  // 6. Financial (Staff/Accountant)
+  transactionsRecorded Payment[] @relation("PaymentRecorder")
+  expensesRecorded     Expense[] @relation("ExpenseRecorder")
+  salariesReceived     Expense[] @relation("ExpenseRecipient")
+
+  // 7. Attendance
+  attendanceRecords Attendance[] @relation("UserAttendance")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -56,17 +100,33 @@ model School {
   address String?
   phone   String?
 
-  // ربط المدير بالمدرسة
+  // Owner
   ownerId String @unique
   owner   User   @relation("SchoolOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  // ربط جميع أعضاء المدرسة (طلاب، معلمين، معاونين)
+  // Members
   members User[] @relation("SchoolMembers")
 
+  // Plan & Subscription
   subscription Subscription?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+
+  // Academic Structure
+  classes Class[]
+
+  // Financial Records
+  payments Payment[]
+  expenses Expense[]
+
+  // Attendance Records
+  attendanceRecords Attendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
+
+// --------------------------------------
+// Subscription & Plans
+// --------------------------------------
 
 model Plan {
   id             String         @id @default(uuid())
@@ -91,6 +151,124 @@ model Subscription {
   startDate DateTime @default(now())
   endDate   DateTime
   status    Status   @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --------------------------------------
+// Academic Structure
+// --------------------------------------
+
+model Class {
+  id   String @id @default(uuid())
+  name String // e.g. "1st Grade"
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  students User[]    @relation("ClassStudents")
+  subjects Subject[]
+  notes    Note[]
+
+  tuitionFee Float @default(0) // Fee for this class
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attendances Attendance[]
+
+  @@unique([schoolId, name])
+}
+
+model Subject {
+  id   String @id @default(uuid())
+  name String // e.g. "Mathematics"
+
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  teacherId String?
+  teacher   User?   @relation("TeacherSubjects", fields: [teacherId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Note {
+  id      String @id @default(uuid())
+  content String // The announcement
+
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  teacherId String
+  teacher   User   @relation("TeacherNotes", fields: [teacherId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// --------------------------------------
+// Financial Module
+// --------------------------------------
+
+model Payment {
+  id     String   @id @default(uuid())
+  amount Float
+  date   DateTime @default(now())
+  note   String? // e.g. "1st Installment"
+
+  studentId String
+  student   User   @relation("StudentPayments", fields: [studentId], references: [id])
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id])
+
+  recordedById String?
+  recordedBy   User?   @relation("PaymentRecorder", fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Expense {
+  id     String      @id @default(uuid())
+  title  String // e.g. "Teacher Salary"
+  amount Float
+  type   ExpenseType
+  date   DateTime    @default(now())
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id])
+
+  recipientId String? // If salary
+  recipient   User?   @relation("ExpenseRecipient", fields: [recipientId], references: [id])
+
+  recordedById String?
+  recordedBy   User?   @relation("ExpenseRecorder", fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --------------------------------------
+// Attendance Module
+// --------------------------------------
+
+model Attendance {
+  id     String           @id @default(uuid())
+  date   DateTime         @default(now())
+  status AttendanceStatus
+  reason String?
+
+  userId String
+  user   User   @relation("UserAttendance", fields: [userId], references: [id], onDelete: Cascade)
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Optional linkage to Class for easier querying (if student)
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
