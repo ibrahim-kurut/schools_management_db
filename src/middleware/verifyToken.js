@@ -21,6 +21,7 @@ function verifyToken(req, res, next) {
             id: decoded.id,
             role: decoded.role,
             author: decoded.author,
+            schoolId: decoded.schoolId,
         };
 
         next();

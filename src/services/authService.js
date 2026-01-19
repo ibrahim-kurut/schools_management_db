@@ -38,6 +38,7 @@ exports.registerUser = async (userData) => {
 exports.loginUser = async (email, password) => {
     const user = await prisma.user.findUnique({
         where: { email },
+        include: { ownedSchool: true }
     });
 
     if (!user) {
@@ -50,7 +51,15 @@ exports.loginUser = async (email, password) => {
         throw new Error("Invalid credentials");
     }
 
-    const token = generateToken({ id: user.id, role: user.role });
+    // get school id from token
+    const schoolId = user.schoolId || (user.ownedSchool ? user.ownedSchool.id : null);
+
+    const token = generateToken({
+        id: user.id,
+        role: user.role,
+        schoolId: schoolId,
+        author: user.firstName + " " + user.lastName
+    });
 
     return { user, token };
 };
