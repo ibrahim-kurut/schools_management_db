@@ -51,3 +51,50 @@ exports.createClassService = async (schoolId, classData) => {
         throw error;
     }
 };
+
+/**
+ * @description get all classes
+ * @route GET /api/classes
+ * @method GET
+ * @access private (school owner and school assistant)
+ */
+exports.getAllClassesService = async (schoolId) => {
+    try {
+        // 2. check if the school exists
+
+        const school = await prisma.school.findUnique({
+            where: { id: schoolId }
+        });
+
+        if (!school) {
+            return { status: "NOT_FOUND", message: "School not found" };
+        }
+
+        // 3. get all classes
+        const classes = await prisma.class.findMany({
+            where: {
+                schoolId
+            },
+            select: {
+                id: true,
+                name: true,
+                tuitionFee: true,
+                _count: {
+                    select: {
+                        students: true
+                    }
+                }
+            }
+        });
+
+        // 4. return the classes
+        return {
+            status: "SUCCESS",
+            message: "Classes fetched successfully",
+            classes: classes
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+

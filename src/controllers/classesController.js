@@ -1,5 +1,6 @@
 const { createClassSchema } = require("../utils/classValidate");
-const { createClassService } = require("../services/classesService");
+const { validateId } = require("../utils/validateUUID");
+const { createClassService, getAllClassesService, getClassStudentsService } = require("../services/classesService");
 
 /**
  * @description create a new class
@@ -14,9 +15,9 @@ exports.createClassController = async (req, res) => {
     try {
         // get school id from token
         const schoolId = req.user.schoolId;
-
-
-        console.log("user", req.user);
+        if (!schoolId) {
+            return res.status(400).json({ message: "School ID is missing from token" });
+        }
 
 
         // 1. validate the request
@@ -48,3 +49,36 @@ exports.createClassController = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+/**
+ * @description get all classes
+ * @route GET /api/classes
+ * @method GET
+ * @access private (school owner)
+ */
+exports.getAllClassesController = async (req, res) => {
+    try {
+        // 1. get school id from token
+        const schoolId = req.user.schoolId;
+        if (!schoolId) {
+            return res.status(400).json({ message: "School ID is missing from token" });
+        }
+
+        // 2. Passing values to Service
+        const result = await getAllClassesService(schoolId);
+
+        // 3. Handling service response
+        if (result.status === "NOT_FOUND") {
+            return res.status(404).json({ message: result.message });
+        }
+
+        // 4. return the classes
+        return res.status(200).json({
+            message: "Classes fetched successfully",
+            classes: result.classes
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
