@@ -98,3 +98,54 @@ exports.getAllClassesService = async (schoolId) => {
     }
 };
 
+/**
+ * @description get all students for a class
+ * @route GET /api/classes/:classId/students
+ * @method GET
+ * @access private (school owner and assistant)
+ */
+exports.getClassStudentsService = async (schoolId, classId) => {
+    try {
+
+        // Optimized: Single query to check existence and fetch students
+        const classWithStudents = await prisma.class.findFirst({
+            where: {
+                id: classId,
+                schoolId: schoolId
+            },
+            include: {
+                students: {
+                    where: { role: "STUDENT" },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                        gender: true,
+                        birthDate: true,
+                        createdAt: true
+                    }
+                }
+            }
+        });
+
+
+        if (!classWithStudents) {
+            return { status: "NOT_FOUND", message: "The requested class was not found in your school records." };
+        }
+
+        if (classWithStudents.students.length === 0) {
+            return { status: "NOT_FOUND", message: "No students found for this class." };
+        }
+
+        // 4. return students
+        return {
+            status: "SUCCESS",
+            message: "Students fetched successfully",
+            students: classWithStudents.students,
+        };
+    } catch (error) {
+        throw error;
+    }
+};

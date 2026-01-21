@@ -6,9 +6,9 @@ const validateIdSchema = Joi.object({
         .guid({ version: ['uuidv4', 'uuidv5'] })
         .required()
         .messages({
-            "any.required": "Profile ID is required",
-            "string.guid": "Invalid Profile ID format",
-            "string.empty": "Profile ID must not be empty"
+            "any.required": "ID is required",
+            "string.guid": "Invalid ID format",
+            "string.empty": "ID must not be empty"
         })
 });
 
