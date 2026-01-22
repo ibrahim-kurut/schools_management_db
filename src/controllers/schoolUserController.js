@@ -32,6 +32,7 @@ exports.addMemberController = async (req, res) => {
         if (error.message.includes("Plan limit reached") ||
             error.message === "User with this email already exists" ||
             error.message === "School plan is not active" ||
+            error.message === "Class not found" ||
             error.message === "Request body cannot be empty"
         ) {
             return res.status(400).json({ message: error.message });
@@ -40,6 +41,11 @@ exports.addMemberController = async (req, res) => {
         // Handle Not Found errors with 404
         if (error.message === "School not found for this user") {
             return res.status(404).json({ message: error.message });
+        }
+
+        // Handle Prisma Unique Constraint error (e.g., email already exists)
+        if (error.code === 'P2002') {
+            return res.status(400).json({ message: "User with this email already exists (Database Constraint)" });
         }
 
         res.status(500).json({ message: "Internal Server Error" });

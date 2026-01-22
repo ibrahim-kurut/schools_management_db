@@ -149,3 +149,9 @@ exports.getClassStudentsService = async (schoolId, classId) => {
         throw error;
     }
 };
+//*! TODO:
+/**
+ * get class by id (school owner and school assistant)
+ * update class (school owner and school assistant)
+ * delete class (school owner and school assistant)
+ */

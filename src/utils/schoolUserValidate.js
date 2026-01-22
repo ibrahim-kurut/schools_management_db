@@ -26,7 +26,11 @@ const addSchoolMemberSchema = Joi.object({
         'date.base': 'Please provide a valid date for birthDate',
         'any.required': 'Birth date is required'
     }),
-    role: Joi.string().valid('TEACHER', 'ASSISTANT', 'STUDENT').required().messages({
+    className: Joi.string().trim().required().messages({
+        'string.empty': 'Class name is required',
+        'any.required': 'Class name is required'
+    }),
+    role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT').required().messages({
         'any.only': 'Role must be one of [TEACHER, ASSISTANT, STUDENT]',
         'any.required': 'Role is required'
     }),

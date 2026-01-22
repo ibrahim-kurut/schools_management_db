@@ -15,7 +15,8 @@ exports.addMemberService = async (requesterId, memberData) => {
             include: {
                 subscription: {
                     include: { plan: true }
-                }
+                },
+                classes: true
             }
         });
 
@@ -27,6 +28,14 @@ exports.addMemberService = async (requesterId, memberData) => {
         if (school.subscription.status !== "ACTIVE") {
             throw new Error("School plan is not active");
         }
+
+        // 3. check if class exists and get its ID
+        const targetClass = school.classes.find((c) => c.name === memberData.className);
+        if (!targetClass) {
+            throw new Error("Class not found");
+        }
+        console.log("targetClass .................", targetClass.id);
+
 
         // 3. Check Plan Limits
         const memberRole = memberData.role;
@@ -69,6 +78,7 @@ exports.addMemberService = async (requesterId, memberData) => {
                 gender: memberData.gender,
                 birthDate: new Date(memberData.birthDate),
                 role: memberData.role,
+                classId: targetClass.id,
                 schoolId: school.id
             }
         });
