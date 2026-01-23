@@ -236,8 +236,58 @@ exports.updateClassService = async (schoolId, classId, classData) => {
     }
 };
 
-
-//*! TODO:
 /**
- * delete class (school owner and school assistant)
+ * @description delete class
+ * @route DELETE /api/classes/:classId
+ * @method DELETE
+ * @access private (school owner and assistant)
  */
+
+exports.deleteClassService = async (schoolId, classId) => {
+    try {
+        // 2. check if the class exists in this school
+        const targetClass = await prisma.class.findFirst({
+            where: {
+                id: classId,
+                schoolId: schoolId,
+            },
+            include: {
+                _count: {
+                    select: {
+                        students: true
+                    }
+                }
+            }
+        });
+        if (!targetClass) {
+            return { status: "NOT_FOUND", message: "Class not found" };
+        }
+
+        let isDeleteClass = true;
+
+        if (targetClass._count.students > 0) {
+            isDeleteClass = false;
+            return { status: "NOT_ALLOWED", message: "Class cannot be deleted as it has students" };
+        }
+
+
+        // 3. delete the class
+        if (isDeleteClass) {
+            const deletedClass = await prisma.class.delete({
+                where: {
+                    id: classId,
+                },
+            });
+            return {
+                status: "SUCCESS",
+                message: "Class deleted successfully",
+                class: deletedClass
+            };
+        }
+
+        // 4. return the class
+
+    } catch (error) {
+        throw error;
+    }
+};

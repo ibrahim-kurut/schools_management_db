@@ -1,6 +1,6 @@
 const { createClassSchema, updateClassSchema } = require("../utils/classValidate");
 const { validateId } = require("../utils/validateUUID");
-const { createClassService, getAllClassesService, getClassStudentsService, getClassByIdService, updateClassService } = require("../services/classesService");
+const { createClassService, getAllClassesService, getClassStudentsService, getClassByIdService, updateClassService, deleteClassService } = require("../services/classesService");
 
 /**
  * @description create a new class
@@ -207,3 +207,44 @@ exports.updateClassController = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
+
+/**
+ * @description delete class
+ * @route DELETE /api/classes/:classId
+ * @method DELETE
+ * @access private (school owner and assistant)
+ */
+
+exports.deleteClassController = async (req, res) => {
+    try {
+        //1.get school id from token
+        const schoolId = req.user.schoolId;
+        if (!schoolId) {
+            return res.status(400).json({ message: "School ID is missing from token" });
+        }
+        //2.validate class id
+        const { error, value } = validateId(req.params.classId);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+        const classId = value.id;
+
+        //3. Call and Passing values to Service
+        const result = await deleteClassService(schoolId, classId);
+        //4. handle service response
+        if (result.status === "NOT_FOUND") {
+            return res.status(404).json({ message: result.message });
+        }
+        if (result.status === "NOT_ALLOWED") {
+            return res.status(400).json({ message: result.message });
+        }
+        //5. return class
+        return res.status(200).json({
+            message: result.message,
+            class: result.class
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
