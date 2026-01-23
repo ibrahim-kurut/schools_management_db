@@ -1,6 +1,6 @@
 const { createClassSchema } = require("../utils/classValidate");
 const { validateId } = require("../utils/validateUUID");
-const { createClassService, getAllClassesService, getClassStudentsService } = require("../services/classesService");
+const { createClassService, getAllClassesService, getClassStudentsService, getClassByIdService } = require("../services/classesService");
 
 /**
  * @description create a new class
@@ -123,3 +123,38 @@ exports.getClassStudentsController = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+/**
+ * @description get class by ID with students list
+ * @route GET /api/classes/:classId
+ * @method GET
+ * @access private (school owner and assistant)
+ */
+exports.getClassByIdController = async (req, res) => {
+    try {
+        //1.get school id from token
+        const schoolId = req.user.schoolId;
+        if (!schoolId) {
+            return res.status(400).json({ message: "School ID is missing from token" });
+        }
+        //2.validate class id
+        const { error, value } = validateId(req.params.classId);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+        //3. Call and Passing values to Service
+        const result = await getClassByIdService(schoolId, value.id);
+        //4. handle service response
+        if (result.status === "NOT_FOUND") {
+            return res.status(404).json({ message: result.message });
+        }
+        //5. return class
+        return res.status(200).json({
+            message: result.message,
+            class: result.class
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}

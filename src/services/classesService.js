@@ -149,6 +149,57 @@ exports.getClassStudentsService = async (schoolId, classId) => {
         throw error;
     }
 };
+
+/**
+ * @description get class by ID with students list
+ * @route GET /api/classes/:classId
+ * @method GET
+ * @access private (school owner and assistant)
+ */
+exports.getClassByIdService = async (schoolId, classId) => {
+
+    try {
+        // 2. check if the class exists in this school
+        const classExists = await prisma.class.findFirst({
+            where: {
+                id: classId,
+                schoolId: schoolId,
+            },
+            include: {
+                students: {
+                    where: { role: "STUDENT" },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                        gender: true,
+                        birthDate: true,
+                        createdAt: true
+                    }
+                }
+            }
+        });
+        if (!classExists) {
+            return { status: "NOT_FOUND", message: "Class not found" };
+        }
+        // 3. return the class
+        return {
+            status: "SUCCESS",
+            message: "Class fetched successfully",
+            class: classExists
+        };
+    } catch (error) {
+        throw error;
+    }
+
+};
+
+
+
+
+
 //*! TODO:
 /**
  * get class by id (school owner and school assistant)
