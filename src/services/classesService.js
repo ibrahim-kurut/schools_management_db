@@ -196,13 +196,48 @@ exports.getClassByIdService = async (schoolId, classId) => {
 
 };
 
-
-
+/**
+ * @description update class
+ * @route PUT /api/classes/:classId
+ * @method PUT
+ * @access private (school owner and assistant)
+ */
+exports.updateClassService = async (schoolId, classId, classData) => {
+    try {
+        console.log("classData from service", classData);
+        // 2. check if the class exists in this school
+        const classExists = await prisma.class.findFirst({
+            where: {
+                id: classId,
+                schoolId: schoolId,
+            },
+        });
+        if (!classExists) {
+            return { status: "NOT_FOUND", message: "Class not found" };
+        }
+        // 3. update the class
+        const updatedClass = await prisma.class.update({
+            where: {
+                id: classId,
+            },
+            data: {
+                name: classData.name,
+                tuitionFee: classData.tuitionFee,
+            },
+        });
+        // 4. return the class
+        return {
+            status: "SUCCESS",
+            message: "Class updated successfully",
+            class: updatedClass
+        };
+    } catch (error) {
+        throw error;
+    }
+};
 
 
 //*! TODO:
 /**
- * get class by id (school owner and school assistant)
- * update class (school owner and school assistant)
  * delete class (school owner and school assistant)
  */
