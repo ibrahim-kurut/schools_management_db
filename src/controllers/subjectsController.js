@@ -1,4 +1,4 @@
-const { createSubjectService, getAllSubjectsService } = require("../services/subjectsService");
+const { createSubjectService, getAllSubjectsService, getSubjectByIdService, getSubjectsCountService } = require("../services/subjectsService");
 const createSubjectSchema = require("../utils/subjectsValidate");
 
 
@@ -45,6 +45,26 @@ exports.getAllSubjectsController = async (req, res) => {
         // 1. get all subjects
         const subjects = await getAllSubjectsService(schoolId);
         return res.status(200).json({ message: "Subjects retrieved successfully", subjects });
+    } catch (error) {
+        console.error("Subject Controller Error:", error);
+        return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });
+    }
+}
+
+/**
+ * @description get a subject by id
+ * @route GET /api/subjects/:id
+ * @method GET
+ * @access private (school owner, assistant)
+ */
+exports.getSubjectByIdController = async (req, res) => {
+    try {
+        // 0. Get school ID from token
+        const schoolId = req.user.schoolId;
+
+        // 1. get subject by id
+        const subject = await getSubjectByIdService(schoolId, req.params.id);
+        return res.status(200).json({ message: "Subject retrieved successfully", subject });
     } catch (error) {
         console.error("Subject Controller Error:", error);
         return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });

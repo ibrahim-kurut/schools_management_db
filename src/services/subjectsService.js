@@ -33,8 +33,6 @@ exports.createSubjectService = async (schoolId, reqData) => {
     }
 
     // 3. If teacherId provided, check if teacher exists and belongs to this school
-
-
     if (teacherId) {
         const teacherExists = await prisma.user.findFirst({
             where: { id: teacherId, schoolId, role: "TEACHER" }
@@ -47,9 +45,6 @@ exports.createSubjectService = async (schoolId, reqData) => {
         }
     }
 
-
-
-    // const teacher = 
     // 4. Create subject
     return await prisma.subject.create({
         data: { name, classId, teacherId },
@@ -74,8 +69,7 @@ exports.getAllSubjectsService = async (schoolId) => {
             where: {
                 class: {
                     schoolId: schoolId
-                },
-
+                }
             },
             include: {
                 class: {
@@ -87,6 +81,35 @@ exports.getAllSubjectsService = async (schoolId) => {
             },
         });
         return subjects;
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * @description get a subject by id
+ * @route GET /api/subjects/:id
+ * @method GET
+ * @access private (school owner, assistant)
+ */
+exports.getSubjectByIdService = async (schoolId, id) => {
+    try {
+        // 1. get subject by id and ensure it belongs to this school
+        const subject = await prisma.subject.findFirst({
+            where: {
+                id: id,
+                class: { schoolId: schoolId }
+            },
+            include: {
+                class: {
+                    select: { name: true }
+                },
+                teacher: {
+                    select: { firstName: true, lastName: true }
+                }
+            },
+        });
+        return subject;
     } catch (error) {
         throw error;
     }
