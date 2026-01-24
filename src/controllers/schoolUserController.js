@@ -83,7 +83,9 @@ exports.getAllMembersController = async (req, res) => {
             }
         });
     } catch (error) {
-        console.log("Error in getAllMembersController:", error);
+        if (error.message === "School not found for this user") {
+            return res.status(404).json({ message: error.message });
+        }
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
