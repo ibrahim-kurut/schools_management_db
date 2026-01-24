@@ -59,3 +59,35 @@ exports.createSubjectService = async (schoolId, reqData) => {
         }
     });
 }
+
+/**
+ * @description get all subjects in a school
+ * @route GET /api/subjects
+ * @method GET
+ * @access private (school owner, assistant)
+ */
+
+exports.getAllSubjectsService = async (schoolId) => {
+    try {
+        // 1. get all subjects for this school by filtering through the Class relation
+        const subjects = await prisma.subject.findMany({
+            where: {
+                class: {
+                    schoolId: schoolId
+                },
+
+            },
+            include: {
+                class: {
+                    select: { name: true }
+                },
+                teacher: {
+                    select: { firstName: true, lastName: true }
+                }
+            },
+        });
+        return subjects;
+    } catch (error) {
+        throw error;
+    }
+}
