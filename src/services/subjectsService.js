@@ -114,3 +114,78 @@ exports.getSubjectByIdService = async (schoolId, id) => {
         throw error;
     }
 }
+
+/**
+ * @description update a subject by id
+ * @route PUT /api/subjects/:id
+ * @method PUT
+ * @access private (school owner, assistant)
+ */
+exports.updateSubjectService = async (schoolId, subjectIdValue, reqData) => {
+    const { id } = subjectIdValue;
+    const { name, teacherId, classId } = reqData; // data from request body
+
+    const subjectName = name.toLowerCase();
+
+    // 1. Check if subject exists and belongs to this school
+    const existingSubject = await prisma.subject.findFirst({
+        where: { id, class: { schoolId } },
+        select: { id: true, name: true, classId: true }
+    });
+
+    if (!existingSubject) {
+        const error = new Error("Subject not found or does not belong to this school");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    // 2. Check if user is trying to change the class
+    if (classId && classId !== existingSubject.classId) {
+        const error = new Error("You cannot move the subject to another class");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // 3. Check if name is already taken in the same class
+    if (subjectName && subjectName !== existingSubject.name.toLowerCase()) {
+        const nameConflict = await prisma.subject.findFirst({
+            where: {
+                name: { equals: subjectName, mode: 'insensitive' },
+                classId: existingSubject.classId,
+                NOT: { id: id }
+            }
+        });
+
+        if (nameConflict) {
+            const error = new Error("This name is already taken in this class");
+            error.statusCode = 409;
+            throw error;
+        }
+    }
+
+    // 4. Check if teacher exists and belongs to this school
+    if (teacherId) {
+        const validTeacher = await prisma.user.findFirst({
+            where: { id: teacherId, schoolId, role: "TEACHER" }
+        });
+
+        if (!validTeacher) {
+            const error = new Error("Teacher not found or does not belong to this school");
+            error.statusCode = 404;
+            throw error;
+        }
+    }
+
+    // 5. Update subject
+    return await prisma.subject.update({
+        where: { id },
+        data: {
+            name: subjectName || undefined,
+            teacherId: teacherId === null ? null : (teacherId || undefined)
+        },
+        include: {
+            class: { select: { name: true } },
+            teacher: { select: { firstName: true, lastName: true } }
+        }
+    });
+};

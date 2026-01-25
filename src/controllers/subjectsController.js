@@ -1,5 +1,6 @@
-const { createSubjectService, getAllSubjectsService, getSubjectByIdService, getSubjectsCountService } = require("../services/subjectsService");
-const createSubjectSchema = require("../utils/subjectsValidate");
+const { createSubjectService, getAllSubjectsService, getSubjectByIdService, getSubjectsCountService, updateSubjectService } = require("../services/subjectsService");
+const { createSubjectSchema, updateSubjectSchema } = require("../utils/subjectsValidate");
+const { validateId } = require("../utils/validateUUID");
 
 
 /**
@@ -70,3 +71,39 @@ exports.getSubjectByIdController = async (req, res) => {
         return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });
     }
 }
+
+/**
+ * @description update a subject by id
+ * @route PUT /api/subjects/:id
+ * @method PUT
+ * @access private (school owner, assistant)
+ */
+exports.updateSubjectController = async (req, res) => {
+    try {
+        // 0. Get school ID from token
+        const schoolId = req.user.schoolId;
+        const subjectId = req.params.id;
+
+        // 1. validate data (Name, ClassId, TeacherId if provided)
+        const { error, value } = updateSubjectSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
+        // 2. validate subject id
+        const { error: subjectIdError, value: subjectIdValue } = validateId(subjectId);
+        if (subjectIdError) {
+            return res.status(400).json({ message: subjectIdError.details[0].message });
+        }
+
+        const reqData = value;
+
+        // 2. update subject by id
+        const updatedSubject = await updateSubjectService(schoolId, subjectIdValue, reqData);
+        return res.status(200).json({ message: "Subject updated successfully", updatedSubject });
+    } catch (error) {
+        console.error("Subject Controller Error:", error);
+        return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });
+    }
+}
+
