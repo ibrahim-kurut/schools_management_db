@@ -45,6 +45,22 @@ enum ExpenseType {
   OTHER
 }
 
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentType {
+  TUITION
+  TRANSPORT
+  BOOKS
+  UNIFORM
+  ACTIVITIES
+  OTHER
+}
+
 // --------------------------------------
 // Core Models
 // --------------------------------------
@@ -90,6 +106,14 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // 8. Academic Results
+  gradesAsStudent Grade[] @relation("StudentGrades")
+  gradesAsTeacher Grade[] @relation("TeacherGrades")
+
+  @@index([email])
+  @@index([role])
+  @@index([schoolId])
 }
 
 model School {
@@ -119,6 +143,9 @@ model School {
 
   // Attendance Records
   attendanceRecords Attendance[]
+
+  // Academic Years
+  academicYears AcademicYear[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -156,6 +183,30 @@ model Subscription {
 }
 
 // --------------------------------------
+// Academic Year Module
+// --------------------------------------
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  name      String // e.g. "2024-2025"
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  grades Grade[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([isCurrent])
+}
+
+// --------------------------------------
 // Academic Structure
 // --------------------------------------
 
@@ -177,6 +228,7 @@ model Class {
   attendances Attendance[]
 
   @@unique([schoolId, name])
+  @@index([schoolId])
 }
 
 model Subject {
@@ -191,6 +243,10 @@ model Subject {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  grades    Grade[]
+
+  @@index([classId])
+  @@index([teacherId])
 }
 
 model Note {
@@ -211,10 +267,13 @@ model Note {
 // --------------------------------------
 
 model Payment {
-  id     String   @id @default(uuid())
-  amount Float
-  date   DateTime @default(now())
-  note   String? // e.g. "1st Installment"
+  id            String        @id @default(uuid())
+  amount        Float
+  date          DateTime      @default(now())
+  note          String? // e.g. "1st Installment"
+  status        PaymentStatus @default(PENDING)
+  paymentType   PaymentType   @default(TUITION)
+  invoiceNumber String?       @unique
 
   studentId String
   student   User   @relation("StudentPayments", fields: [studentId], references: [id])
@@ -227,6 +286,11 @@ model Payment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([status])
+  @@index([date])
 }
 
 model Expense {
@@ -247,6 +311,10 @@ model Expense {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([type])
+  @@index([date])
 }
 
 // --------------------------------------
@@ -271,4 +339,38 @@ model Attendance {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, schoolId])
+  @@index([schoolId])
+  @@index([date])
+}
+
+// --------------------------------------
+// Grades Module
+// --------------------------------------
+
+model Grade {
+  id         String @id @default(uuid())
+  score      Float // الدرجة التي حصل عليها الطالب
+  totalScore Float  @default(100) // الدرجة الكاملة
+  examType   String // مثلاً: "شهر أول"، "نصف سنة"، "نهائي"
+
+  studentId String
+  student   User   @relation("StudentGrades", fields: [studentId], references: [id])
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  teacherId String
+  teacher   User   @relation("TeacherGrades", fields: [teacherId], references: [id])
+
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([academicYearId])
 }
