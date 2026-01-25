@@ -189,3 +189,34 @@ exports.updateSubjectService = async (schoolId, subjectIdValue, reqData) => {
         }
     });
 };
+
+/**
+ * @description delete a subject by id
+ * @route DELETE /api/subjects/:id
+ * @method DELETE
+ * @access private (school owner, assistant)
+ */
+exports.deleteSubjectService = async (schoolId, subjectIdValue) => {
+    const { id } = subjectIdValue;
+
+    // 1. Check if subject exists and belongs to this school
+    const existingSubject = await prisma.subject.findFirst({
+        where: { id, class: { schoolId } },
+        select: { id: true, name: true, classId: true }
+    });
+
+    if (!existingSubject) {
+        const error = new Error("Subject not found or does not belong to this school");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    // 2. Delete subject
+    return await prisma.subject.delete({
+        where: { id },
+        include: {
+            class: { select: { name: true } },
+            teacher: { select: { firstName: true, lastName: true } }
+        }
+    });
+};

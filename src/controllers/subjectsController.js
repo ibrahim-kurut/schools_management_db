@@ -1,4 +1,4 @@
-const { createSubjectService, getAllSubjectsService, getSubjectByIdService, getSubjectsCountService, updateSubjectService } = require("../services/subjectsService");
+const { createSubjectService, getAllSubjectsService, getSubjectByIdService, getSubjectsCountService, updateSubjectService, deleteSubjectService } = require("../services/subjectsService");
 const { createSubjectSchema, updateSubjectSchema } = require("../utils/subjectsValidate");
 const { validateId } = require("../utils/validateUUID");
 
@@ -101,6 +101,33 @@ exports.updateSubjectController = async (req, res) => {
         // 2. update subject by id
         const updatedSubject = await updateSubjectService(schoolId, subjectIdValue, reqData);
         return res.status(200).json({ message: "Subject updated successfully", updatedSubject });
+    } catch (error) {
+        console.error("Subject Controller Error:", error);
+        return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });
+    }
+}
+
+/**
+ * @description delete a subject by id
+ * @route DELETE /api/subjects/:id
+ * @method DELETE
+ * @access private (school owner, assistant)
+ */
+exports.deleteSubjectController = async (req, res) => {
+    try {
+        // 0. Get school ID from token
+        const schoolId = req.user.schoolId;
+        const subjectId = req.params.id;
+
+        // 1. validate subject id
+        const { error: subjectIdError, value: subjectIdValue } = validateId(subjectId);
+        if (subjectIdError) {
+            return res.status(400).json({ message: subjectIdError.details[0].message });
+        }
+
+        // 2. delete subject by id
+        const deletedSubject = await deleteSubjectService(schoolId, subjectIdValue);
+        return res.status(200).json({ message: "Subject deleted successfully", deletedSubject });
     } catch (error) {
         console.error("Subject Controller Error:", error);
         return res.status(error.statusCode || 500).json({ message: error.message || "Internal server error" });
