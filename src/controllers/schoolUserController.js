@@ -19,10 +19,23 @@ exports.addMemberController = async (req, res) => {
         // The service now handles: School Fetching, Plan Limits, Email Check, Password Hash, Creation
         const newUser = await addMemberService(req.user.id, value);
 
+        // 3. Format Response
+        let responseUser = newUser;
+
+        // If it's a student, return the class name 
+        if (newUser.role === "STUDENT" && newUser.class) {
+            responseUser = {
+                ...newUser,
+                className: newUser.class.name,
+                class: undefined
+            };
+        }
+
+
         // 3. Response
         res.status(201).json({
             message: "Member added successfully",
-            user: newUser
+            user: responseUser
         });
 
     } catch (error) {
