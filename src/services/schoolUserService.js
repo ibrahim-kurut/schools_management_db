@@ -104,66 +104,67 @@ exports.addMemberService = async (requesterId, memberData) => {
  * @access private (school owner)
  */
 
-exports.getAllMembersService = async (requesterId, page, limit, searchWord) => {
-    try {
-        const skip = (page - 1) * limit;
+exports.getAllMembersService = async (requesterId, page, limit, searchWord, roleFilter) => {
+    const skip = (page - 1) * limit;
 
-        // 1. Get School Basic Info
-        const school = await prisma.school.findUnique({
-            where: { ownerId: requesterId },
-            select: { id: true, name: true, slug: true, logo: true }
-        });
+    // 1. Get School Basic Info
+    const school = await prisma.school.findUnique({
+        where: { ownerId: requesterId },
+        select: { id: true, name: true, slug: true, logo: true }
+    });
 
-        if (!school) {
-            throw new Error("School not found for this user");
-        }
-
-        // 2. Get Total Count of Members (for Pagination)
-        const totalMembers = await prisma.user.count({
-            where: {
-                schoolId: school.id,
-                OR: [
-                    { firstName: { contains: searchWord, mode: 'insensitive' } },
-                    { lastName: { contains: searchWord, mode: 'insensitive' } }
-                ]
-            }
-        });
-
-        // 3. Get Members for Current Page
-        const members = await prisma.user.findMany({
-            where: {
-                schoolId: school.id,
-                OR: [
-                    { firstName: { contains: searchWord, mode: 'insensitive' } },
-                    { lastName: { contains: searchWord, mode: 'insensitive' } }
-                ]
-            },
-            skip: skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-                gender: true,
-                birthDate: true,
-                role: true,
-                schoolId: true,
-                createdAt: true,
-            }
-        });
-
-        return {
-            school,
-            members,
-            totalMembers
-        };
-
-    } catch (error) {
-        throw error;
+    if (!school) {
+        throw new Error("School not found for this user");
     }
+
+    // 2. Build dynamic where clause
+    const whereClause = {
+        schoolId: school.id,
+    };
+
+    // Add search filter (OR logic: search in firstName OR lastName)
+    if (searchWord && searchWord.trim() !== "") {
+        whereClause.OR = [
+            { firstName: { contains: searchWord, mode: 'insensitive' } },
+            { lastName: { contains: searchWord, mode: 'insensitive' } }
+        ];
+    }
+
+    // Add role filter only if provided
+    if (roleFilter) {
+        whereClause.role = roleFilter;
+    }
+
+    // 3. Get Total Count of Members (for Pagination)
+    const totalMembers = await prisma.user.count({
+        where: whereClause
+    });
+
+    // 4. Get Members for Current Page
+    const members = await prisma.user.findMany({
+        where: whereClause,
+        skip: skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            gender: true,
+            birthDate: true,
+            role: true,
+            schoolId: true,
+            createdAt: true,
+        }
+    });
+
+    return {
+        school,
+        members,
+        totalMembers
+    };
 };
 
 
@@ -173,7 +174,6 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord) => {
 
 //*! TODO
 /**
- *?
  *? Get a specific member by ID
  *? Update a member
  *? Delete a member

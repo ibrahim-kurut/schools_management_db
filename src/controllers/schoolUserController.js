@@ -73,14 +73,20 @@ exports.addMemberController = async (req, res) => {
  */
 exports.getAllMembersController = async (req, res) => {
     try {
-
         // 1. Extracting page and limit from query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const searchWord = req.query.search || "";
 
-        // 2. Passing values to Service
-        const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord);
+        // 2. Validate and set roleFilter
+        const validRoles = ["TEACHER", "ASSISTANT", "ACCOUNTANT", "STUDENT"];
+        const roleFromQuery = req.query.role?.toUpperCase();
+
+        // If role is provided and valid, use it; otherwise, use undefined (no filter)
+        const roleFilter = validRoles.includes(roleFromQuery) ? roleFromQuery : undefined;
+
+        // 3. Passing values to Service
+        const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord, roleFilter);
 
         res.status(200).json({
             message: "Members fetched successfully",
