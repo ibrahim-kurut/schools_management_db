@@ -1,5 +1,6 @@
-const { addMemberService, getAllMembersService } = require("../services/schoolUserService");
+const { addMemberService, getAllMembersService, getMemberByIdService } = require("../services/schoolUserService");
 const { addSchoolMemberSchema } = require("../utils/schoolUserValidate");
+const { validateId } = require("../utils/validateUUID");
 
 /**
  * @description Add a new member to a school
@@ -105,6 +106,48 @@ exports.getAllMembersController = async (req, res) => {
         if (error.message === "School not found for this user") {
             return res.status(404).json({ message: error.message });
         }
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+/**
+ * @description  Get a member by ID
+ * @route GET /api/school-user/:id
+ * @method GET
+ * @access private (school owner)
+ */
+exports.getMemberByIdController = async (req, res) => {
+    try {
+        // 1. Validate ID
+        const { error, value } = validateId(req.params.id);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
+        // 2. Extract validated ID and Owner ID
+        const memberId = value.id;  // ✅ Fixed: extract id from value object
+        const ownerId = req.user.id;
+
+        // 3. Call Service (Pass Owner ID + Member ID)
+        const member = await getMemberByIdService(ownerId, memberId);
+
+        // 4. Response
+        res.status(200).json({
+            message: "Member fetched successfully",
+            member
+        });
+    } catch (error) {
+        // Handle 404 errors
+        if (error.message === "School not found for this user" ||
+            error.message === "Member not found") {
+            return res.status(404).json({ message: error.message });
+        }
+
+        // Handle 403 Forbidden - member doesn't belong to this school
+        if (error.message === "Member does not belong to this school") {
+            return res.status(403).json({ message: error.message });
+        }
+
         res.status(500).json({ message: "Internal Server Error" });
     }
 };

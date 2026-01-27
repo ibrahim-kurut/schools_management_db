@@ -168,13 +168,71 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
 };
 
 
+/**
+ * @description  Get a member by ID
+ * @route GET /api/school-user/:id
+ * @method GET
+ * @access private (school owner)
+ */
+
+exports.getMemberByIdService = async (ownerId, memberId) => {
+    // 1. Get School for the Requester (Owner)
+    const school = await prisma.school.findUnique({
+        where: { ownerId: ownerId },
+        select: { id: true }
+    });
+
+    if (!school) {
+        throw new Error("School not found for this user");
+    }
+
+    // 2. Get Member by ID
+    const member = await prisma.user.findUnique({
+        where: { id: memberId },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            gender: true,
+            birthDate: true,
+            role: true,
+            schoolId: true,
+            createdAt: true,
+            class: {
+                select: {
+                    id: true,
+                    name: true,
+                    tuitionFee: true
+                }
+            },
+        }
+    });
+    if (!member) {
+        throw new Error("Member not found");
+    }
+
+    // 3. Check if Member belongs to the School
+    if (member.schoolId !== school.id) {
+        throw new Error("Member does not belong to this school");
+    }
+
+    return member;
+
+};
+
+
 
 
 
 
 //*! TODO
 /**
- *? Get a specific member by ID
  *? Update a member
  *? Delete a member
+ *? GET /profile - User profile (for logged-in user to see their own data)
+ *? GET /school-user/:id/grades - Detailed grades for a member
+ *? GET /school-user/:id/payments - Detailed payments for a member
+ *? GET /school-user/:id/attendance - Attendance history for a member
  */
