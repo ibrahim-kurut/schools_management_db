@@ -222,14 +222,119 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
 
 };
 
+/**
+ * @description Update a member
+ * @route PUT /api/school-user/:id
+ * @method PUT
+ * @access private (school owner)
+ */
 
+exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
+    // 1. Get School for the Requester (Owner)
+    const school = await prisma.school.findUnique({
+        where: { ownerId: ownerId },
+        include: {
+            members: { where: { id: memberId } }
+        }
+    });
+
+    if (!school) {
+        throw new Error("School not found for this user");
+    }
+
+    // 2. check if member exists in school
+    const targetMember = school.members[0];
+    if (!targetMember) {
+        throw new Error("Member not found in this school");
+    }
+
+    // 3. Get the role of the user performing the update
+    const requester = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { role: true }
+    });
+
+    // 4. Specify allowed fields according to user role
+    let dataToUpdate;
+
+    if (requester.role === "ASSISTANT") {
+        // 5. Assistant: Can edit only limited fields
+        const allowedFieldsForAssistant = ['firstName', 'lastName', 'phone', 'gender', 'birthDate'];
+
+        dataToUpdate = {};
+        for (const field of allowedFieldsForAssistant) {
+            if (reqData[field] !== undefined) {
+                dataToUpdate[field] = field === 'birthDate'
+                    ? new Date(reqData[field])
+                    : reqData[field];
+            }
+        }
+
+        // Check for fields to update
+        if (Object.keys(dataToUpdate).length === 0) {
+            throw new Error("No valid fields to update for your role");
+        }
+    } else {
+        // 6. Owner: Can edit all fields
+        dataToUpdate = { ...reqData };
+
+        // Handle className if sent
+        if (dataToUpdate.className) {
+            // Search for the class by name in the database (better performance than fetching all classes)
+            const targetClass = await prisma.class.findFirst({
+                where: {
+                    schoolId: school.id,
+                    name: dataToUpdate.className
+                }
+            });
+
+            if (!targetClass) {
+                throw new Error("Class not found in this school");
+            }
+
+            // Update classId and delete className
+            dataToUpdate.classId = targetClass.id;
+            delete dataToUpdate.className;
+        }
+
+        // Convert birthDate
+        if (dataToUpdate.birthDate) {
+            dataToUpdate.birthDate = new Date(dataToUpdate.birthDate);
+        }
+
+        // Hash password
+        if (dataToUpdate.password) {
+            dataToUpdate.password = await hashPassword(dataToUpdate.password);
+        }
+    }
+
+    // 7. Execute the update
+    const updatedMember = await prisma.user.update({
+        where: { id: memberId },
+        data: dataToUpdate,
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            gender: true,
+            birthDate: true,
+            role: true,
+            schoolId: true,
+            createdAt: true,
+            updatedAt: true
+        }
+    });
+
+    return updatedMember;
+}
 
 
 
 
 //*! TODO
 /**
- *? Update a member
  *? Delete a member
  *? GET /profile - User profile (for logged-in user to see their own data)
  *? GET /school-user/:id/grades - Detailed grades for a member

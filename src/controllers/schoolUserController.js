@@ -1,5 +1,5 @@
-const { addMemberService, getAllMembersService, getMemberByIdService } = require("../services/schoolUserService");
-const { addSchoolMemberSchema } = require("../utils/schoolUserValidate");
+const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService } = require("../services/schoolUserService");
+const { addSchoolMemberSchema, updateSchoolMemberSchema } = require("../utils/schoolUserValidate");
 const { validateId } = require("../utils/validateUUID");
 
 /**
@@ -151,4 +151,66 @@ exports.getMemberByIdController = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+/**
+ * @description Update a member
+ * @route PUT /api/school-user/:id
+ * @method PUT
+ * @access private (school owner)
+ */
+
+exports.updateMemberByIdController = async (req, res) => {
+    try {
+        // 1. Validate ID
+        const { error: idError, value: idValue } = validateId(req.params.id);
+        if (idError) {
+            return res.status(400).json({ message: idError.details[0].message });
+        }
+
+        // 2. Validate Body
+        const { error: bodyError, value: bodyValue } = updateSchoolMemberSchema.validate(req.body);
+        if (bodyError) {
+            return res.status(400).json({ message: bodyError.details[0].message });
+        }
+
+        // 3. Extract validated ID and Owner ID
+        const memberId = idValue.id;
+        const ownerId = req.user.id;
+        const reqData = bodyValue;
+
+        // 4. Call Service (Pass Owner ID + Member ID + Request Data)
+        const member = await updateMemberByIdService(ownerId, memberId, reqData);
+
+        // 5. Response
+        res.status(200).json({
+            message: "Member updated successfully",
+            member
+        });
+        console.log("res.statusCode .........", res.statusCode);
+
+    }
+
+
+    catch (error) {
+        // Handle 404 errors
+        if (error.message === "School not found for this user" ||
+            error.message === "Member not found in this school") {
+            return res.status(404).json({ message: error.message });
+        }
+
+        // Handle 400 Bad Request (Business Logic)
+        if (error.message === "No valid fields to update for your role") {
+            return res.status(400).json({ message: error.message });
+        }
+
+        // Handle Prisma Unique Constraint error (e.g., email already exists)
+        if (error.code === 'P2002') {
+            return res.status(400).json({ message: "User with this email already exists" });
+        }
+
+        console.error("Error in updateMemberByIdController:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
 

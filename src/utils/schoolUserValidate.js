@@ -33,6 +33,19 @@ const addSchoolMemberSchema = Joi.object({
     }),
 });
 
+const updateSchoolMemberSchema = Joi.object({
+    firstName: Joi.string().trim().empty('').optional(),
+    lastName: Joi.string().trim().empty('').optional(),
+    email: Joi.string().trim().email().empty('').optional(),
+    password: Joi.string().trim().min(6).empty('').optional(),
+    phone: Joi.string().trim().empty('').optional(),
+    gender: Joi.string().trim().valid('MALE', 'FEMALE').empty('').optional(),
+    birthDate: Joi.date().empty('').optional(),
+    className: Joi.string().trim().empty('').optional(),
+    role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').empty('').optional(),
+});
+
 module.exports = {
-    addSchoolMemberSchema
+    addSchoolMemberSchema,
+    updateSchoolMemberSchema
 };
