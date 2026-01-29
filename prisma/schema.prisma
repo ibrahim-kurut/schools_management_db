@@ -75,6 +75,7 @@ model User {
   gender    Gender
   birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)
+  isDeleted Boolean  @default(false)
 
   // --- Relations ---
 

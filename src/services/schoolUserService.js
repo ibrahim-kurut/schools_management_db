@@ -120,6 +120,7 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
     // 2. Build dynamic where clause
     const whereClause = {
         schoolId: school.id,
+        isDeleted: false,
     };
 
     // Add search filter (OR logic: search in firstName OR lastName)
@@ -209,7 +210,7 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
             },
         }
     });
-    if (!member) {
+    if (!member || member.isDeleted) {
         throw new Error("Member not found");
     }
 
@@ -234,7 +235,7 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
     const school = await prisma.school.findUnique({
         where: { ownerId: ownerId },
         include: {
-            members: { where: { id: memberId } }
+            members: { where: { id: memberId, isDeleted: false } }
         }
     });
 
@@ -331,11 +332,60 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
 }
 
 
+/**
+ * @description Delete a member
+ * @route DELETE /api/school-user/:id
+ * @method DELETE
+ * @access private (school owner)
+ */
+
+exports.deleteMemberByIdService = async (ownerId, memberId) => {
+    // 1. Get School for the Requester (Owner)
+    const school = await prisma.school.findUnique({
+        where: { ownerId: ownerId },
+        include: {
+            members: { where: { id: memberId, isDeleted: false } }
+        }
+    });
+
+    if (!school) {
+        throw new Error("School not found for this user");
+    }
+
+    // 2. Check if member exists in school
+    const targetMember = school.members[0];
+    if (!targetMember) {
+        throw new Error("Member not found in this school");
+    }
+
+    // 3. Delete the member (Soft Delete)
+    const deletedMember = await prisma.user.update({
+        where: { id: memberId },
+        data: { isDeleted: true },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            gender: true,
+            birthDate: true,
+            role: true,
+            schoolId: true,
+            createdAt: true,
+            updatedAt: true,
+            isDeleted: true
+        }
+    });
+
+    return deletedMember;
+}
+
+
 
 
 //*! TODO
 /**
- *? Delete a member
  *? GET /profile - User profile (for logged-in user to see their own data)
  *? GET /school-user/:id/grades - Detailed grades for a member
  *? GET /school-user/:id/payments - Detailed payments for a member

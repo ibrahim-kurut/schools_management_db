@@ -1,4 +1,4 @@
-const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService } = require("../services/schoolUserService");
+const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService, deleteMemberByIdService } = require("../services/schoolUserService");
 const { addSchoolMemberSchema, updateSchoolMemberSchema } = require("../utils/schoolUserValidate");
 const { validateId } = require("../utils/validateUUID");
 
@@ -186,8 +186,6 @@ exports.updateMemberByIdController = async (req, res) => {
             message: "Member updated successfully",
             member
         });
-        console.log("res.statusCode .........", res.statusCode);
-
     }
 
 
@@ -209,6 +207,49 @@ exports.updateMemberByIdController = async (req, res) => {
         }
 
         console.error("Error in updateMemberByIdController:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+/**
+ * @description Delete a member
+ * @route DELETE /api/school-user/:id
+ * @method DELETE
+ * @access private (school owner)
+ */
+exports.deleteMemberByIdController = async (req, res) => {
+    try {
+        // 1. Validate ID
+        const { error: idError, value: idValue } = validateId(req.params.id);
+        if (idError) {
+            return res.status(400).json({ message: idError.details[0].message });
+        }
+
+        // 2. Extract validated ID and Owner ID
+        const memberId = idValue.id;
+        const ownerId = req.user.id;
+
+        // 3. Call Service (Pass Owner ID + Member ID)
+        const deletedMember = await deleteMemberByIdService(ownerId, memberId);
+
+        // 4. Response
+        res.status(200).json({
+            message: "Member deleted successfully",
+            member: deletedMember
+        });
+    } catch (error) {
+        // Handle 404 errors
+        if (error.message === "School not found for this user" ||
+            error.message === "Member not found in this school") {
+            return res.status(404).json({ message: error.message });
+        }
+
+        // Handle 403 Forbidden - member doesn't belong to this school
+        if (error.message === "Member does not belong to this school") {
+            return res.status(403).json({ message: error.message });
+        }
+
+        console.error("Error in deleteMemberByIdController:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
