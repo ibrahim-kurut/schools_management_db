@@ -1,4 +1,4 @@
-const planService = require("../services/planServies");
+const planService = require("../services/planServices");
 const { createPlanSchema, updatePlanSchema } = require("../utils/planValidate");
 const { validateId } = require("../utils/validateUUID");
 
