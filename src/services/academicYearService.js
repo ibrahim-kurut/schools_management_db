@@ -38,3 +38,42 @@ exports.createAcademicYearService = async (schoolId, reqData) => {
 
     return { status: "SUCCESS", message: "Academic year created successfully", academicYear: newAcademicYear };
 };
+
+/**
+ * @description get all academic years
+ * @route GET /api/academic-year
+ * @method GET
+ * @access private (school owner, assistant)
+ */
+
+exports.getAcademicYearsService = async (schoolId) => {
+    try {
+        // 1. check if the school exists
+        const school = await prisma.school.findUnique({
+            where: { id: schoolId }
+        });
+        if (!school) {
+            return { status: "NOT_FOUND", message: "School not found" };
+        }
+
+        // 2. get all academic years
+        const academicYears = await prisma.academicYear.findMany({
+            where: { schoolId: schoolId },
+            include: {
+                school: {
+                    select: {
+                        name: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        // 3. return the academic years
+        return { status: "SUCCESS", message: "Academic years retrieved successfully", academicYears: academicYears };
+    } catch (error) {
+        throw error;
+    }
+}
