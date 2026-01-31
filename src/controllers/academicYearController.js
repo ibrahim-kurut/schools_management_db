@@ -1,4 +1,4 @@
-const { createAcademicYearService, getAcademicYearsService } = require("../services/academicYearService");
+const { createAcademicYearService, getAcademicYearsService, getAcademicYearByIdService } = require("../services/academicYearService");
 const { createAcademicYearSchema } = require("../utils/academicYearValidate");
 
 
@@ -55,6 +55,31 @@ exports.getAcademicYearsController = async (req, res) => {
         return res.status(200).json({ message: "Academic years retrieved successfully", academicYears });
     } catch (error) {
         console.log("Error in getAllAcademicYearsController:", error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+/**
+ * @description get academic year by id
+ * @route GET /api/academic-year/:id
+ * @method GET
+ * @access private (school owner, assistant)
+ */
+exports.getAcademicYearByIdController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const academicYearId = req.params.id;
+
+        const academicYear = await getAcademicYearByIdService(schoolId, academicYearId);
+        if (academicYear.status === "NOT_FOUND") {
+            return res.status(404).json({ message: academicYear.message });
+        }
+        if (academicYear.status === "CONFLICT") {
+            return res.status(400).json({ message: academicYear.message });
+        }
+        return res.status(200).json({ message: "Academic year retrieved successfully", academicYear });
+    } catch (error) {
+        console.log("Error in getAcademicYearByIdController:", error);
         res.status(500).json({ message: error.message });
     }
 }
