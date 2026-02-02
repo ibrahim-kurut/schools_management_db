@@ -1,5 +1,5 @@
-const { createAcademicYearService, getAcademicYearsService, getAcademicYearByIdService } = require("../services/academicYearService");
-const { createAcademicYearSchema } = require("../utils/academicYearValidate");
+const { createAcademicYearService, getAcademicYearsService, getAcademicYearByIdService, updateAcademicYearService } = require("../services/academicYearService");
+const { createAcademicYearSchema, updateAcademicYearSchema } = require("../utils/academicYearValidate");
 
 
 /**
@@ -80,6 +80,38 @@ exports.getAcademicYearByIdController = async (req, res) => {
         return res.status(200).json({ message: "Academic year retrieved successfully", academicYear });
     } catch (error) {
         console.log("Error in getAcademicYearByIdController:", error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+/**
+ * @description update academic year
+ * @route PUT /api/academic-year/:id
+ * @method PUT
+ * @access private (school owner, assistant)
+ */
+exports.updateAcademicYearController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const academicYearId = req.params.id;
+
+        // 1. validate the request data
+        const { error, value } = updateAcademicYearSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+        const academicYearData = value;
+        // 2. call the service and pass the request data
+        const academicYear = await updateAcademicYearService(schoolId, academicYearId, academicYearData);
+        if (academicYear.status === "NOT_FOUND") {
+            return res.status(404).json({ message: academicYear.message });
+        }
+        if (academicYear.status === "CONFLICT") {
+            return res.status(400).json({ message: academicYear.message });
+        }
+        return res.status(200).json({ message: "Academic year updated successfully", academicYear });
+    } catch (error) {
+        console.log("Error in updateAcademicYearController:", error);
         res.status(500).json({ message: error.message });
     }
 }
