@@ -1,4 +1,4 @@
-const { createAcademicYearService, getAcademicYearsService, getAcademicYearByIdService, updateAcademicYearService } = require("../services/academicYearService");
+const { createAcademicYearService, getAcademicYearsService, getAcademicYearByIdService, updateAcademicYearService, deleteAcademicYearService } = require("../services/academicYearService");
 const { createAcademicYearSchema, updateAcademicYearSchema } = require("../utils/academicYearValidate");
 
 
@@ -112,6 +112,28 @@ exports.updateAcademicYearController = async (req, res) => {
         return res.status(200).json({ message: "Academic year updated successfully", academicYear });
     } catch (error) {
         console.log("Error in updateAcademicYearController:", error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+/**
+ * @description delete academic year
+ * @route DELETE /api/academic-year/:id
+ * @method DELETE
+ * @access private (school owner, assistant)
+ */
+exports.deleteAcademicYearController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const academicYearId = req.params.id;
+
+        const academicYear = await deleteAcademicYearService(schoolId, academicYearId);
+        if (academicYear.status === "NOT_FOUND") {
+            return res.status(404).json({ message: academicYear.message });
+        }
+        return res.status(200).json({ message: "Academic year deleted successfully", academicYear });
+    } catch (error) {
+        console.log("Error in deleteAcademicYearController:", error);
         res.status(500).json({ message: error.message });
     }
 }

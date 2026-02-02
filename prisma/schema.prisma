@@ -193,6 +193,7 @@ model AcademicYear {
   startDate DateTime
   endDate   DateTime
   isCurrent Boolean  @default(false)
+  isDeleted Boolean  @default(false)
 
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)

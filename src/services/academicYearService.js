@@ -58,7 +58,11 @@ exports.getAcademicYearsService = async (schoolId) => {
 
         // 2. get all academic years
         const academicYears = await prisma.academicYear.findMany({
-            where: { schoolId: schoolId },
+            where: {
+                schoolId: schoolId,
+                isDeleted: false
+            },
+
             include: {
                 school: {
                     select: {
@@ -70,9 +74,26 @@ exports.getAcademicYearsService = async (schoolId) => {
                 createdAt: 'desc'
             }
         });
-
-        // 3. return the academic years
-        return { status: "SUCCESS", message: "Academic years retrieved successfully", academicYears: academicYears };
+        // 1. total academic years
+        const totalAll = await prisma.academicYear.count({
+            where: { schoolId: schoolId }
+        });
+        // 2. total deleted academic years
+        const totalDeleted = await prisma.academicYear.count({
+            where: { schoolId: schoolId, isDeleted: true }
+        });
+        // 3. total active academic years
+        const totalActive = totalAll - totalDeleted;
+        return {
+            status: "SUCCESS",
+            message: "Data retrieved",
+            academicYears: academicYears,
+            stats: {
+                totalAcademicYears: totalAll,
+                deletedAcademicYears: totalDeleted,
+                activeAcademicYears: totalActive
+            }
+        };
     } catch (error) {
         throw error;
     }
@@ -178,6 +199,45 @@ exports.updateAcademicYearService = async (schoolId, academicYearId, reqData) =>
         });
 
         return { status: "SUCCESS", message: "Academic year updated successfully", academicYear: updatedAcademicYear };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * @description delete academic year
+ * @route DELETE /api/academic-year/:id
+ * @method DELETE
+ * @access private (school owner, assistant)
+ */
+exports.deleteAcademicYearService = async (schoolId, academicYearId) => {
+    try {
+        // 1. check if the school exists
+        const school = await prisma.school.findUnique({
+            where: { id: schoolId }
+        });
+        if (!school) {
+            return { status: "NOT_FOUND", message: "School not found" };
+        }
+
+        // 2. check if the academic year exists AND belongs to the school
+        const academicYear = await prisma.academicYear.findUnique({
+            where: { id: academicYearId, schoolId: schoolId }
+        });
+        if (!academicYear) {
+            return { status: "NOT_FOUND", message: "Academic year not found" };
+        }
+
+        // 3. delete the academic year (Soft Delete with Rename)
+        const deletedAcademicYear = await prisma.academicYear.update({
+            where: { id: academicYearId },
+            data: {
+                isDeleted: true,
+                name: `${academicYear.name}_deleted_${Date.now()}` // Rename to free up the name
+            }
+        });
+
+        return { status: "SUCCESS", message: "Academic year deleted successfully", academicYear: deletedAcademicYear };
     } catch (error) {
         throw error;
     }
