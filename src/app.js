@@ -12,4 +12,5 @@ app.use('/api/school-user', require('./routes/schoolUserRoutes'));
 app.use('/api/classes', require('./routes/classesRoutes'));
 app.use('/api/subjects', require('./routes/subjectsRoutes'));
 app.use('/api/academic-year', require('./routes/academicYearRoutes'));
+app.use('/api/profile', require('./routes/profileRoutes'));
 module.exports = app;
