@@ -65,6 +65,16 @@ const createGradeSchema = Joi.object({
         }),
 });
 
+const studentIdParamSchema = Joi.object({
+    studentId: Joi.string()
+        .uuid()
+        .required()
+        .messages({
+            'string.guid': 'Student ID must be a valid UUID',
+            'any.required': 'Student ID is required'
+        })
+});
+
 const updateGradeSchema = Joi.object({
     score: Joi.number()
         .min(0)

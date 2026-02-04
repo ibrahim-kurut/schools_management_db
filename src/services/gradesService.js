@@ -101,3 +101,42 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
         throw error;
     }
 };
+
+/**
+ * @description get all grades of one student in the current academic year
+ * @route GET /api/grades/student/:studentId
+ * @method GET
+ * @access private (school admin, teacher, assistant)
+ */
+exports.getGradesByStudentIdService = async (studentId, schoolId, userRole) => {
+    // 1. check if the student belongs to the school
+    const student = await prisma.user.findFirst({
+        where: { id: studentId, role: 'STUDENT', schoolId, isDeleted: false },
+        select: { id: true }
+    });
+
+    if (!student) {
+        throw { statusCode: 404, message: "Student not found" };
+    }
+
+    if (userRole !== 'SCHOOL_ADMIN' && userRole !== 'ASSISTANT') {
+        throw { statusCode: 403, message: "Not authorized to view all student grades" };
+    }
+
+    // 2. get all grades for the student in the current academic year
+    const grades = await prisma.grade.findMany({
+        where: { studentId, academicYear: { isCurrent: true } },
+        include: {
+            student: { select: { id: true, firstName: true, lastName: true } },
+            subject: { select: { id: true, name: true } },
+            academicYear: { select: { id: true, name: true } }
+        },
+        orderBy: [
+            { academicYearId: 'asc' },
+            { subjectId: 'asc' },
+            { examType: 'asc' }
+        ]
+    });
+
+    return grades;
+};
