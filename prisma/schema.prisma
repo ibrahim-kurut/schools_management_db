@@ -61,6 +61,31 @@ enum PaymentType {
   OTHER
 }
 
+enum ExamType {
+  // النصف الأول - First Semester
+  OCTOBER
+  NOVEMBER
+  DECEMBER
+  FIRST_SEMESTER_AVG // محسوبة تلقائياً
+
+  //  نصف السنة - Midyear
+  MIDYEAR
+
+  // النصف الثاني - Second Semester
+  MARCH
+  APRIL
+  SECOND_SEMESTER_AVG // محسوبة تلقائياً
+
+  // المحصلة النهائية - Final Results
+  ANNUAL_EFFORT // السعي السنوي (محسوب)
+  FINAL_EXAM // الامتحان النهائي
+  FINAL_GRADE // الدرجة النهائية (محسوبة)
+
+  // الدور الثاني - Second Round
+  SECOND_ROUND_EXAM // امتحان الدور الثاني (للراسبين فقط)
+  LAST_GRADE // الدرجة الأخيرة (محسوبة)
+}
+
 // --------------------------------------
 // Core Models
 // --------------------------------------
@@ -352,10 +377,10 @@ model Attendance {
 // --------------------------------------
 
 model Grade {
-  id         String @id @default(uuid())
-  score      Float // الدرجة التي حصل عليها الطالب
-  totalScore Float  @default(100) // الدرجة الكاملة
-  examType   String // مثلاً: "شهر أول"، "نصف سنة"، "نهائي"
+  id           String   @id @default(uuid())
+  score        Float // الدرجة التي حصل عليها الطالب (0-100)
+  examType     ExamType // نوع الامتحان
+  isCalculated Boolean  @default(false) // هل الدرجة محسوبة تلقائياً؟
 
   studentId String
   student   User   @relation("StudentGrades", fields: [studentId], references: [id])
@@ -372,7 +397,10 @@ model Grade {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // منع تكرار نفس الدرجة لنفس الطالب/المادة/السنة/نوع الامتحان
+  @@unique([studentId, subjectId, academicYearId, examType])
   @@index([studentId])
   @@index([subjectId])
   @@index([academicYearId])
+  @@index([examType])
 }
