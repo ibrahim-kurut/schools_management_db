@@ -5,6 +5,6 @@ const { createGradeController, getGradesByStudentIdController } = require("../co
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 
 router.post("/", verifyToken, authorize(["SCHOOL_ADMIN", "TEACHER"]), createGradeController);
-router.get("/student/:studentId", verifyToken, authorize(["SCHOOL_ADMIN", "TEACHER", "ASSISTANT"]), getGradesByStudentIdController);
+router.get("/student/:studentId", verifyToken, authorize(["SCHOOL_ADMIN", "ASSISTANT"]), getGradesByStudentIdController);
 
 module.exports = router;

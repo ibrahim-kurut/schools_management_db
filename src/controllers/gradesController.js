@@ -44,27 +44,38 @@ exports.createGradeController = async (req, res) => {
 };
 
 /**
- * @description get all grades of one student in the current academic year
- * @route GET /api/grades/student/:studentId
+ * @description get grades of one student (defaults to current academic year, supports filtering)
+ * @route GET /api/grades/student/:studentId?academicYearId=...
  * @method GET
- * @access private (school admin, teacher, assistant)
+ * @access private (school admin, assistant)
  */
 exports.getGradesByStudentIdController = async (req, res) => {
     try {
         const schoolId = req.user.schoolId;
         const { studentId } = req.params;
+        const { academicYearId } = req.query; // Get academicYearId from query params
         const userRole = req.user.role;
 
         //1. validate studentId
-        const { error } = validateId(studentId);
-        if (error) {
+        const { error: studentIdError } = validateId(studentId);
+        if (studentIdError) {
             return res.status(400).json({
-                success: false, message: error.details[0].message,
+                success: false, message: studentIdError.details[0].message,
             });
         }
 
-        //2. call service and pass schoolId and studentId
-        const grades = await getGradesByStudentIdService(studentId, schoolId, userRole);
+        // Validate academicYearId if provided
+        if (academicYearId) {
+            const { error: yearIdError } = validateId(academicYearId);
+            if (yearIdError) {
+                return res.status(400).json({
+                    success: false, message: yearIdError.details[0].message,
+                });
+            }
+        }
+
+        //2. call service and pass schoolId, studentId, and optional academicYearId
+        const grades = await getGradesByStudentIdService(studentId, schoolId, userRole, academicYearId);
 
         //3. Return success response
         return res.status(200).json({

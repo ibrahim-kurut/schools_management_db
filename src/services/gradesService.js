@@ -103,12 +103,12 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
 };
 
 /**
- * @description get all grades of one student in the current academic year
- * @route GET /api/grades/student/:studentId
+ * @description get grades of one student (defaults to current academic year, supports filtering)
+ * @route GET /api/grades/student/:studentId?academicYearId=...
  * @method GET
- * @access private (school admin, teacher, assistant)
+ * @access private (school admin, assistant)
  */
-exports.getGradesByStudentIdService = async (studentId, schoolId, userRole) => {
+exports.getGradesByStudentIdService = async (studentId, schoolId, userRole, academicYearId = null) => {
     // 1. check if the student belongs to the school
     const student = await prisma.user.findFirst({
         where: { id: studentId, role: 'STUDENT', schoolId, isDeleted: false },
@@ -123,9 +123,30 @@ exports.getGradesByStudentIdService = async (studentId, schoolId, userRole) => {
         throw { statusCode: 403, message: "Not authorized to view all student grades" };
     }
 
-    // 2. get all grades for the student in the current academic year
+    // 2. Determine which academic year to fetch
+    // If academicYearId is provided, use it.
+    // If NOT provided, find the "current" academic year for the school.
+    let filterYearId = academicYearId;
+
+    if (!filterYearId) {
+        const currentYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isCurrent: true, isDeleted: false },
+            select: { id: true }
+        });
+        if (currentYear) {
+            filterYearId = currentYear.id;
+        }
+    }
+
+    // 3. Prepare where clause
+    const whereClause = { studentId };
+    if (filterYearId) {
+        whereClause.academicYearId = filterYearId;
+    }
+
+    // 4. get grades
     const grades = await prisma.grade.findMany({
-        where: { studentId, academicYear: { isCurrent: true } },
+        where: whereClause,
         include: {
             student: { select: { id: true, firstName: true, lastName: true } },
             subject: { select: { id: true, name: true } },
@@ -140,3 +161,12 @@ exports.getGradesByStudentIdService = async (studentId, schoolId, userRole) => {
 
     return grades;
 };
+
+//! TODO
+/** 
+ * جلب درجات طالب واحد في سنة دراسية معينة (سيناريو منفصل لاحقاً)
+ * جلب معلم المادة درجات مادة الذي يدرسه فقط
+ * الطالب يستطيع جلب درجاته للسنة الحالية فقط
+ * الادمن والمساعد (تم تنفيذها) يستطيعون جلب درجات أي طالب في أي سنة دراسية
+ */
+
