@@ -1,5 +1,5 @@
-const { createGradeService, getGradesByStudentIdService } = require("../services/gradesService");
-const { createGradeSchema, studentIdParamSchema } = require("../utils/gradesValidate");
+const { createGradeService, getGradesByStudentIdService, getStudentGradesService } = require("../services/gradesService");
+const { createGradeSchema } = require("../utils/gradesValidate");
 const { validateId } = require("../utils/validateUUID");
 
 /**
@@ -92,3 +92,38 @@ exports.getGradesByStudentIdController = async (req, res) => {
         });
     }
 };
+
+/**
+ * @description student can view his grades for the current academic year in all subjects
+ * @route GET /api/grades/student/:studentId
+ * @method GET
+ * @access private (student only )
+ */
+
+exports.getStudentGradesController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const studentId = req.user.id; // Use the authenticated student's ID
+        const userRole = req.user.role;
+
+        // Ensure user is a student
+        if (userRole !== 'STUDENT') {
+            return res.status(403).json({
+                success: false,
+                message: "Only students can view their own grades"
+            });
+        }
+
+        // Call service to get student's grades for current academic year
+        const grades = await getStudentGradesService(studentId, schoolId, userRole);
+
+        return res.status(200).json({
+            success: true,
+            message: "Student grades retrieved successfully",
+            grades
+        });
+
+    } catch (error) {
+
+    }
+}

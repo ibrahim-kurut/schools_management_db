@@ -147,10 +147,15 @@ exports.getGradesByStudentIdService = async (studentId, schoolId, userRole, acad
     // 4. get grades
     const grades = await prisma.grade.findMany({
         where: whereClause,
-        include: {
-            student: { select: { id: true, firstName: true, lastName: true } },
-            subject: { select: { id: true, name: true } },
-            academicYear: { select: { id: true, name: true } }
+        select: {
+            score: true,
+            examType: true,
+            subject: {
+                select: { name: true }
+            },
+            academicYear: {
+                select: { name: true }
+            }
         },
         orderBy: [
             { academicYearId: 'asc' },
@@ -162,11 +167,43 @@ exports.getGradesByStudentIdService = async (studentId, schoolId, userRole, acad
     return grades;
 };
 
-//! TODO
-/** 
- * 
- * جلب معلم المادة درجات مادة الذي يدرسه فقط
- * الطالب يستطيع جلب درجاته للسنة الحالية فقط
- * الادمن والمساعد (تم تنفيذها) يستطيعون جلب درجات أي طالب في أي سنة دراسية
+/**
+ * @description student can view his grades for the current academic year in all subjects
+ * @route GET /api/grades/student/:studentId
+ * @method GET
+ * @access private (student only )
  */
+exports.getStudentGradesService = async (studentId, schoolId, userRole) => {
+    // 1. Verifying the presence of student at school
+    const student = await prisma.user.findFirst({
+        where: { id: studentId, role: 'STUDENT', schoolId, isDeleted: false },
+        select: { id: true }
+    });
+
+    if (!student) {
+        throw { statusCode: 404, message: "Student not found" };
+    }
+
+    // 2. get grades for the current academic year only
+    const grades = await prisma.grade.findMany({
+        where: {
+            studentId,
+            academicYear: {
+                isCurrent: true,
+                isDeleted: false
+            }
+        },
+        select: {
+            score: true,
+            examType: true,
+            subject: { select: { name: true } },
+            academicYear: { select: { name: true } }
+        },
+        orderBy: {
+            subject: { name: 'asc' }
+        }
+    });
+
+    return grades;
+};
 
