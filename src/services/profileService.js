@@ -74,3 +74,12 @@ exports.getUserProfileService = async (userId) => {
         };
     }
 };
+
+
+
+//! TODO
+/**
+
+تعديل getUserProfileService لتضمين قائمة المواد (subjects) والصفوف المرتبطة بها للمعلم.
+السماح للمعلم بجلب قائمة طلاب الصفوف التي يُدرسها.
+ */

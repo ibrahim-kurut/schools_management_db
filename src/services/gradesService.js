@@ -207,3 +207,80 @@ exports.getStudentGradesService = async (studentId, schoolId, userRole) => {
     return grades;
 };
 
+
+/**
+ * @description  get grades for the subjects taught by the teacher
+ * @route GET /api/grades/subject-teacher/:studentId
+ * @method GET
+ * @access private (subject teacher only )
+ */
+
+exports.getSubjectTeacherStudentGradesService = async (schoolId, teacherId, studentId, academicYearId = null) => {
+    // 1. Verify teacher exists (implicitly handled by middleware)
+
+    // 2. Verify student exists in the school
+    const student = await prisma.user.findFirst({
+        where: { id: studentId, role: 'STUDENT', schoolId, isDeleted: false },
+        select: { id: true, firstName: true, lastName: true }
+    });
+
+    if (!student) {
+        throw { statusCode: 404, message: "Student not found" };
+    }
+
+    // 3. Determine academic year (Use provided or default to current)
+    let filterYearId = academicYearId;
+    if (!filterYearId) {
+        const currentYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isCurrent: true, isDeleted: false },
+            select: { id: true }
+        });
+        if (currentYear) {
+            filterYearId = currentYear.id;
+        }
+    }
+
+    // 4. Create a "where" clause.
+    // We use OR to show grades if the teacher is the registrar or designated subject teacher.
+    // This ensures they see the manual scores and calculated averages.
+    const whereClause = {
+        studentId,
+        subject: { class: { schoolId } }, // Safety check within school
+        OR: [
+            { teacherId: teacherId },
+            { subject: { teacherId: teacherId } }
+        ]
+    };
+
+    if (filterYearId) {
+        whereClause.academicYearId = filterYearId;
+    }
+
+    // 5. Fetch Grades
+    const grades = await prisma.grade.findMany({
+        where: whereClause,
+        select: {
+            id: true,
+            score: true,
+            examType: true,
+            subject: { select: { name: true } },
+            academicYear: { select: { name: true } },
+            student: { select: { firstName: true, lastName: true } }
+        },
+        orderBy: [
+            { academicYearId: 'desc' },
+            { subject: { name: 'asc' } }
+        ]
+    });
+
+    return grades;
+}
+
+//! TODO
+/**
+
+ * 
+ * الطالب يستطيع جلب درجاته للسنة الحالية فقط
+ * الادمن والمساعد (تم تنفيذها) يستطيعون جلب درجات أي طالب في أي سنة دراسية
+ */
+

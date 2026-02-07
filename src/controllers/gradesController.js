@@ -1,4 +1,4 @@
-const { createGradeService, getGradesByStudentIdService, getStudentGradesService } = require("../services/gradesService");
+const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService } = require("../services/gradesService");
 const { createGradeSchema } = require("../utils/gradesValidate");
 const { validateId } = require("../utils/validateUUID");
 
@@ -125,5 +125,54 @@ exports.getStudentGradesController = async (req, res) => {
 
     } catch (error) {
 
+    }
+}
+
+/**
+ * @description  get grades for the subjects taught by the teacher
+ * @route GET /api/grades/subject-teacher/:studentId
+ * @method GET
+ * @access private (subject teacher only )
+ */
+
+exports.getSubjectTeacherStudentGradesController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const teacherId = req.user.id;
+        const { studentId } = req.params;
+        const { academicYearId } = req.query;
+
+        // Validate studentId
+        const { error: studentIdError } = validateId(studentId);
+        if (studentIdError) {
+            return res.status(400).json({
+                success: false, message: studentIdError.details[0].message,
+            });
+        }
+
+        // Validate academicYearId if provided
+        if (academicYearId) {
+            const { error: yearIdError } = validateId(academicYearId);
+            if (yearIdError) {
+                return res.status(400).json({
+                    success: false, message: yearIdError.details[0].message,
+                });
+            }
+        }
+
+        const grades = await getSubjectTeacherStudentGradesService(schoolId, teacherId, studentId, academicYearId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Student grades retrieved successfully",
+            grades
+        });
+
+    } catch (error) {
+        console.error("Subject Teacher Student Grades Controller Error:", error);
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
     }
 }
