@@ -1,5 +1,5 @@
-const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService } = require("../services/gradesService");
-const { createGradeSchema } = require("../utils/gradesValidate");
+const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService, updateGradeService } = require("../services/gradesService");
+const { createGradeSchema, updateGradeSchema } = require("../utils/gradesValidate");
 const { validateId } = require("../utils/validateUUID");
 
 /**
@@ -170,6 +170,56 @@ exports.getSubjectTeacherStudentGradesController = async (req, res) => {
 
     } catch (error) {
         console.error("Subject Teacher Student Grades Controller Error:", error);
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || "Internal server error",
+        });
+    }
+}
+
+/**
+ * @description update grade
+ * @route PUT /api/grades/:gradeId
+ * @method PUT
+ * @access private (subject teacher only )
+ */
+
+exports.updateGradeController = async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const { studentId } = req.params;
+
+        // 1. Validate studentId from params
+        const { error: studentIdError } = validateId(studentId);
+        if (studentIdError) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid student identity",
+            });
+        }
+
+        // 2. Validate request body
+        const { error: bodyError, value: updateData } = updateGradeSchema.validate(req.body);
+        if (bodyError) {
+            return res.status(400).json({
+                success: false,
+                message: bodyError.details[0].message
+            });
+        }
+
+        // 3. Call service to update grade
+        const updatedGrade = await updateGradeService(studentId, updateData, schoolId, userId, userRole);
+
+        return res.status(200).json({
+            success: true,
+            message: "Grade updated successfully",
+            grade: updatedGrade
+        });
+
+    } catch (error) {
+        console.error("Update Grade Controller Error:", error);
         return res.status(error.statusCode || 500).json({
             success: false,
             message: error.message || "Internal server error",

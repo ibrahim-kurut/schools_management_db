@@ -76,14 +76,28 @@ const studentIdParamSchema = Joi.object({
 });
 
 const updateGradeSchema = Joi.object({
+    gradeId: Joi.string()
+        .uuid()
+        .required()
+        .messages({
+            'string.guid': 'Grade ID must be a valid UUID',
+            'any.required': 'Grade ID is required'
+        }),
+
     score: Joi.number()
         .min(0)
         .max(100)
-        .required()
+        .optional()
         .messages({
             'number.min': 'Score must be at least 0',
             'number.max': 'Score must be at most 100',
-            'any.required': 'Score is required'
+        }),
+
+    examType: Joi.string()
+        .valid(...MANUAL_EXAM_TYPES)
+        .optional()
+        .messages({
+            'any.only': `Exam type must be one of: ${MANUAL_EXAM_TYPES.join(', ')}`,
         }),
 });
 

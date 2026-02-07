@@ -79,7 +79,13 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
                     teacherId: userId,
                     academicYearId
                 },
-                include: {
+                select: {
+                    id: true,
+                    score: true,
+                    examType: true,
+                    isCalculated: true,
+                    createdAt: true,
+                    updatedAt: true,
                     student: { select: { firstName: true, lastName: true } },
                     subject: { select: { name: true } },
                     academicYear: { select: { name: true } }
@@ -276,11 +282,101 @@ exports.getSubjectTeacherStudentGradesService = async (schoolId, teacherId, stud
     return grades;
 }
 
-//! TODO
 /**
-
- * 
- * الطالب يستطيع جلب درجاته للسنة الحالية فقط
- * الادمن والمساعد (تم تنفيذها) يستطيعون جلب درجات أي طالب في أي سنة دراسية
+ * @description update grade
+ * @route PUT /api/grades/:gradeId
+ * @method PUT
+ * @access private (school admin, assistant and subject teacher only )
  */
+
+exports.updateGradeService = async (studentId, updateData, schoolId, userId, userRole) => {
+    const { gradeId, score, examType } = updateData;
+
+    // 1. Fetch existing grade and check student context
+    const existingGrade = await prisma.grade.findFirst({
+        where: { id: gradeId, studentId },
+        include: {
+            subject: {
+                select: {
+                    teacherId: true,
+                    class: { select: { schoolId: true } }
+                }
+            }
+        }
+    });
+
+    // 2. Resource Validation
+    if (!existingGrade) {
+        throw { statusCode: 404, message: "Grade record not found for this student" };
+    }
+
+    if (existingGrade.subject.class.schoolId !== schoolId) {
+        throw { statusCode: 403, message: "Unauthorized access to this school's data" };
+    }
+
+    // Prevent manually updating automated grades
+    if (existingGrade.isCalculated) {
+        throw { statusCode: 400, message: "Cannot manually update automatically calculated grades" };
+    }
+
+    // 3. Permission Checks
+    const isAdmin = userRole === 'SCHOOL_ADMIN';
+    const isAssistant = userRole === 'ASSISTANT';
+    const isTeacher = userRole === 'TEACHER';
+    const isSubjectTeacher = existingGrade.subject.teacherId === userId;
+    const isGradeCreator = existingGrade.teacherId === userId;
+
+    if (!isAdmin && !isAssistant) {
+        // Teachers can only update if they teach the subject OR they were the ones who entered the grade
+        if (!isTeacher || (!isSubjectTeacher && !isGradeCreator)) {
+            throw { statusCode: 403, message: "You do not have permission to update this grade" };
+        }
+    }
+
+    // 4. Update & Recalculate Averages (Atomic Transaction)
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            // A. Update the grade record
+            const updated = await tx.grade.update({
+                where: { id: gradeId },
+                data: {
+                    ...(score !== undefined && { score }),
+                    ...(examType !== undefined && { examType }),
+                    updatedAt: new Date()
+                },
+                select: {
+                    id: true,
+                    score: true,
+                    examType: true,
+                    isCalculated: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    student: { select: { firstName: true, lastName: true } },
+                    subject: { select: { name: true } },
+                    academicYear: { select: { name: true } }
+                }
+            });
+
+            // B. Re-calculate all related averages for this student/subject
+            await calculateAveragesIfNeeded(
+                tx,
+                existingGrade.studentId,
+                existingGrade.subjectId,
+                existingGrade.academicYearId,
+                userId
+            );
+
+            return updated;
+        });
+
+        return result;
+
+    } catch (error) {
+        // Handle Unique Constraint Violation (P2002) - e.g. if examType is changed to an existing one
+        if (error.code === 'P2002') {
+            throw { statusCode: 409, message: "A grade for this exam type already exists for this subject" };
+        }
+        throw error;
+    }
+};
 
