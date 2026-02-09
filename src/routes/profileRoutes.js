@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { getUserProfileController } = require("../controllers/profileController");
-const { verifyToken } = require("../middleware/verifyToken");
+const { getUserProfileController, getTeacherStudentsController } = require("../controllers/profileController");
+const { verifyToken, authorize } = require("../middleware/verifyToken");
 
 router.get("/", verifyToken, getUserProfileController);
+router.get("/teacher/students", verifyToken, authorize("TEACHER"), getTeacherStudentsController);
 
 module.exports = router;

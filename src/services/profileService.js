@@ -19,67 +19,105 @@ exports.getUserProfileService = async (userId) => {
                 paymentsMade: true,
                 // for teacher
                 salariesReceived: true,
+                subjects: {
+                    include: {
+                        class: {
+                            select: { id: true, name: true }
+                        }
+                    }
+                },
                 // for all
-                attendanceRecords: true,
+                attendanceRecords: {
+                    take: 10, // Just a sample for performance
+                    orderBy: { date: 'desc' }
+                },
             },
         });
 
         // check if user exists
         if (!user) {
-            return {
-                status: "ERROR",
-                message: "User not found",
-            };
+            throw { statusCode: 404, message: "User not found" };
         }
 
         // check if user is deleted
         if (user.isDeleted) {
-            return {
-                status: "ERROR",
-                message: "User account has been deleted",
-            };
+            throw { statusCode: 403, message: "User account has been deleted" };
         }
 
-        // if user is student
+        const { password, ...userData } = user;
+
+        // Role-based data filtering
         if (user.role === 'STUDENT') {
-            const { password, salariesReceived, ...studentData } = user;
+            const { salariesReceived, subjects, ...studentProfile } = userData;
             return {
                 status: "SUCCESS",
                 message: "Student profile retrieved",
-                user: studentData
+                user: studentProfile
             };
-        }
-        // if user is teacher
-        else if (user.role === 'TEACHER' || user.role === 'ASSISTANT' || user.role === 'ACCOUNTANT' || user.role === 'SUPER_ADMIN') {
-            const { password, gradesAsStudent, paymentsMade, ...teacherData } = user;
+        } else if (user.role === 'TEACHER') {
+            const { gradesAsStudent, paymentsMade, ...teacherProfile } = userData;
             return {
                 status: "SUCCESS",
                 message: "Teacher profile retrieved",
-                user: teacherData
+                user: teacherProfile
             };
         } else {
-            // SCHOOL_ADMIN, SUPER_ADMIN
-            const { password, salariesReceived, ...adminData } = user;
+            // Admin, Assistant, Accountant, etc.
+            const { gradesAsStudent, paymentsMade, ...adminProfile } = userData;
             return {
                 status: "SUCCESS",
                 message: "User profile retrieved",
-                user: adminData
+                user: adminProfile
             };
         }
     } catch (error) {
-        return {
-            status: "ERROR",
-            message: "Failed to retrieve user profile",
-            error: error.message
-        };
+        throw error;
     }
 };
 
 
 
-//! TODO
 /**
-
-تعديل getUserProfileService لتضمين قائمة المواد (subjects) والصفوف المرتبطة بها للمعلم.
-السماح للمعلم بجلب قائمة طلاب الصفوف التي يُدرسها.
+ * @description Get classes and students for a teacher
+ * @param {string} teacherId
+ * @returns {Promise<Array>} List of classes with their students
  */
+exports.getTeacherStudentsService = async (teacherId) => {
+    try {
+        // 1. Find all classes where the teacher is teaching a subject
+        const teacherClasses = await prisma.class.findMany({
+            where: {
+                subjects: {
+                    some: {
+                        teacherId: teacherId
+                    }
+                }
+            },
+            include: {
+                students: {
+                    where: { isDeleted: false },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        gender: true,
+                        phone: true
+                    }
+                },
+                subjects: {
+                    where: { teacherId: teacherId },
+                    select: { name: true }
+                }
+            }
+        });
+
+        return {
+            status: "SUCCESS",
+            message: "Teacher classes and students retrieved",
+            classes: teacherClasses
+        };
+    } catch (error) {
+        throw error;
+    }
+};
