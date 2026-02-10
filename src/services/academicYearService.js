@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 /**
  * @description create a new academic year
@@ -36,6 +37,9 @@ exports.createAcademicYearService = async (schoolId, reqData) => {
         data: { ...reqData, schoolId: schoolId }
     });
 
+    // 5. Invalidate List Cache
+    await redis.del(`school:${schoolId}:academic-years`);
+
     return { status: "SUCCESS", message: "Academic year created successfully", academicYear: newAcademicYear };
 };
 
@@ -54,6 +58,13 @@ exports.getAcademicYearsService = async (schoolId) => {
         });
         if (!school) {
             return { status: "NOT_FOUND", message: "School not found" };
+        }
+
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:academic-years`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
         }
 
         // 2. get all academic years
@@ -84,7 +95,7 @@ exports.getAcademicYearsService = async (schoolId) => {
         });
         // 3. total active academic years
         const totalActive = totalAll - totalDeleted;
-        return {
+        const result = {
             status: "SUCCESS",
             message: "Data retrieved",
             academicYears: academicYears,
@@ -94,6 +105,11 @@ exports.getAcademicYearsService = async (schoolId) => {
                 activeAcademicYears: totalActive
             }
         };
+
+        // 4. Save to Redis Cache (1 hour)
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
+        return result;
     } catch (error) {
         throw error;
     }
@@ -115,6 +131,14 @@ exports.getAcademicYearByIdService = async (schoolId, academicYearId) => {
             return { status: "NOT_FOUND", message: "School not found" };
         }
 
+
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:academic-year:${academicYearId}`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+
         // 2. get the academic year
         const academicYear = await prisma.academicYear.findUnique({
             where: { id: academicYearId },
@@ -132,7 +156,12 @@ exports.getAcademicYearByIdService = async (schoolId, academicYearId) => {
         }
 
         // 3. return the academic year
-        return { status: "SUCCESS", message: "Academic year retrieved successfully", academicYear: academicYear };
+        const result = { status: "SUCCESS", message: "Academic year retrieved successfully", academicYear: academicYear };
+
+        // 4. Save to Redis Cache (1 hour)
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
+        return result;
     } catch (error) {
         throw error;
     }
@@ -198,6 +227,10 @@ exports.updateAcademicYearService = async (schoolId, academicYearId, reqData) =>
             data: reqData
         });
 
+        // 7. Invalidate Caches (List + Item)
+        await redis.del(`school:${schoolId}:academic-years`);
+        await redis.del(`school:${schoolId}:academic-year:${academicYearId}`);
+
         return { status: "SUCCESS", message: "Academic year updated successfully", academicYear: updatedAcademicYear };
     } catch (error) {
         throw error;
@@ -236,6 +269,10 @@ exports.deleteAcademicYearService = async (schoolId, academicYearId) => {
                 name: `${academicYear.name}_deleted_${Date.now()}` // Rename to free up the name
             }
         });
+
+        // 4. Invalidate Caches (List + Item)
+        await redis.del(`school:${schoolId}:academic-years`);
+        await redis.del(`school:${schoolId}:academic-year:${academicYearId}`);
 
         return { status: "SUCCESS", message: "Academic year deleted successfully", academicYear: deletedAcademicYear };
     } catch (error) {

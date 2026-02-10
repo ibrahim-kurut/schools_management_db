@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 
 /**
@@ -155,6 +156,15 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
  */
 exports.getSchoolByIdService = async (id, userId, userRole) => {
 
+    // 0. Check Redis Cache
+    const cacheKey = `school:${id}`;
+    const cachedSchool = await redis.get(cacheKey);
+
+    if (cachedSchool) {
+        // Return cached data if available
+        return JSON.parse(cachedSchool);
+    }
+
     // 1. Fetching school by id
     const school = await prisma.school.findUnique({
         where: {
@@ -179,7 +189,10 @@ exports.getSchoolByIdService = async (id, userId, userRole) => {
         throw new Error("FORBIDDEN");
     }
 
-    // 4. Returning school
+    // 4. Save to Redis Cache (for 1 hour = 3600 seconds)
+    await redis.set(cacheKey, JSON.stringify(school), 'EX', 3600);
+
+    // 5. Returning school
     return school;
 }
 
@@ -225,6 +238,9 @@ exports.updateSchoolByIdService = async (id, schoolData, userId, userRole) => {
         data: schoolData
     });
 
+    // 7. Invalidate Cache (Delete the old data so next fetch gets fresh data)
+    await redis.del(`school:${id}`);
+
     // 7. Returning updated school
     return updatedSchool;
 }
@@ -261,6 +277,9 @@ exports.deleteSchoolByIdService = async (id, userId, userRole) => {
         }
     });
 
-    // 5. Returning deleted school
+    // 5. Invalidate Cache
+    await redis.del(`school:${id}`);
+
+    // 6. Returning deleted school
     return deletedSchool;
 }

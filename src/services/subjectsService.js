@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 /**
  * @description Add a new subject to a class
@@ -46,13 +47,18 @@ exports.createSubjectService = async (schoolId, reqData) => {
     }
 
     // 4. Create subject
-    return await prisma.subject.create({
+    const newSubject = await prisma.subject.create({
         data: { name, classId, teacherId },
         include: {
             class: { select: { name: true } },
             teacher: { select: { firstName: true, lastName: true } }
         }
     });
+
+    // 5. Invalidate List Cache
+    await redis.del(`school:${schoolId}:subjects`);
+
+    return newSubject;
 }
 
 /**
@@ -64,6 +70,13 @@ exports.createSubjectService = async (schoolId, reqData) => {
 
 exports.getAllSubjectsService = async (schoolId) => {
     try {
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:subjects`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+
         // 1. get all subjects for this school by filtering through the Class relation
         const subjects = await prisma.subject.findMany({
             where: {
@@ -80,11 +93,15 @@ exports.getAllSubjectsService = async (schoolId) => {
                 }
             },
         });
+
+        // 2. Save to Redis Cache (1 hour)
+        await redis.set(cacheKey, JSON.stringify(subjects), 'EX', 3600);
+
         return subjects;
     } catch (error) {
         throw error;
     }
-}
+};
 
 /**
  * @description get a subject by id
@@ -94,6 +111,13 @@ exports.getAllSubjectsService = async (schoolId) => {
  */
 exports.getSubjectByIdService = async (schoolId, id) => {
     try {
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:subject:${id}`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+
         // 1. get subject by id and ensure it belongs to this school
         const subject = await prisma.subject.findFirst({
             where: {
@@ -109,11 +133,17 @@ exports.getSubjectByIdService = async (schoolId, id) => {
                 }
             },
         });
+
+        // 2. Save to Redis Cache (1 hour)
+        if (subject) {
+            await redis.set(cacheKey, JSON.stringify(subject), 'EX', 3600);
+        }
+
         return subject;
     } catch (error) {
         throw error;
     }
-}
+};
 
 /**
  * @description update a subject by id
@@ -177,7 +207,7 @@ exports.updateSubjectService = async (schoolId, subjectIdValue, reqData) => {
     }
 
     // 5. Update subject
-    return await prisma.subject.update({
+    const updatedSubject = await prisma.subject.update({
         where: { id },
         data: {
             name: subjectName || undefined,
@@ -188,6 +218,12 @@ exports.updateSubjectService = async (schoolId, subjectIdValue, reqData) => {
             teacher: { select: { firstName: true, lastName: true } }
         }
     });
+
+    // 6. Invalidate Caches (List + Item)
+    await redis.del(`school:${schoolId}:subjects`);
+    await redis.del(`school:${schoolId}:subject:${id}`);
+
+    return updatedSubject;
 };
 
 /**
@@ -212,11 +248,17 @@ exports.deleteSubjectService = async (schoolId, subjectIdValue) => {
     }
 
     // 2. Delete subject
-    return await prisma.subject.delete({
+    const deletedSubject = await prisma.subject.delete({
         where: { id },
         include: {
             class: { select: { name: true } },
             teacher: { select: { firstName: true, lastName: true } }
         }
     });
+
+    // 3. Invalidate Caches (List + Item)
+    await redis.del(`school:${schoolId}:subjects`);
+    await redis.del(`school:${schoolId}:subject:${id}`);
+
+    return deletedSubject;
 };

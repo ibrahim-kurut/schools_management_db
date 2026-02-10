@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 /**
  * @description create a new class
@@ -40,7 +41,10 @@ exports.createClassService = async (schoolId, classData) => {
             },
         });
 
-        // 5. return the class
+        // 5. Invalidate List Cache
+        await redis.del(`school:${schoolId}:classes`);
+
+        // 6. return the class
         return {
             status: "SUCCESS",
             message: "Class created successfully",
@@ -70,6 +74,13 @@ exports.getAllClassesService = async (schoolId) => {
             return { status: "NOT_FOUND", message: "School not found" };
         }
 
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:classes`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+
         // 3. get all classes
         const classes = await prisma.class.findMany({
             where: {
@@ -88,11 +99,16 @@ exports.getAllClassesService = async (schoolId) => {
         });
 
         // 4. return the classes
-        return {
+        const result = {
             status: "SUCCESS",
             message: "Classes fetched successfully",
             classes: classes
         };
+
+        // 5. Save to Redis Cache (1 hour)
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
+        return result;
     } catch (error) {
         throw error;
     }
@@ -159,6 +175,13 @@ exports.getClassStudentsService = async (schoolId, classId) => {
 exports.getClassByIdService = async (schoolId, classId) => {
 
     try {
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:class:${classId}`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+
         // 2. check if the class exists in this school
         const classExists = await prisma.class.findFirst({
             where: {
@@ -185,11 +208,16 @@ exports.getClassByIdService = async (schoolId, classId) => {
             return { status: "NOT_FOUND", message: "Class not found" };
         }
         // 3. return the class
-        return {
+        const result = {
             status: "SUCCESS",
             message: "Class fetched successfully",
             class: classExists
         };
+
+        // 4. Save to Redis Cache (1 hour)
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+
+        return result;
     } catch (error) {
         throw error;
     }
@@ -226,11 +254,17 @@ exports.updateClassService = async (schoolId, classId, classData) => {
             },
         });
         // 4. return the class
-        return {
+        const result = {
             status: "SUCCESS",
             message: "Class updated successfully",
             class: updatedClass
         };
+
+        // 5. Invalidate Caches (List + Item)
+        await redis.del(`school:${schoolId}:classes`);
+        await redis.del(`school:${schoolId}:class:${classId}`);
+
+        return result;
     } catch (error) {
         throw error;
     }
@@ -272,20 +306,24 @@ exports.deleteClassService = async (schoolId, classId) => {
 
 
         // 3. delete the class
+        let deletedClass = null;
         if (isDeleteClass) {
-            const deletedClass = await prisma.class.delete({
+            deletedClass = await prisma.class.delete({
                 where: {
                     id: classId,
                 },
             });
-            return {
-                status: "SUCCESS",
-                message: "Class deleted successfully",
-                class: deletedClass
-            };
         }
 
-        // 4. return the class
+        // 5. Invalidate Caches (List + Item)
+        await redis.del(`school:${schoolId}:classes`);
+        await redis.del(`school:${schoolId}:class:${classId}`);
+
+        return {
+            status: "SUCCESS",
+            message: "Class deleted successfully",
+            class: deletedClass
+        };
 
     } catch (error) {
         throw error;
