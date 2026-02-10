@@ -1,6 +1,14 @@
 version: '3.8'
 
 services:
+
+# add redis service for caching
+  redis:
+    image: redis:alpine
+    container_name: schools_management_redis
+    restart: always
+    ports:
+      - "6379:6379"
   db:
     image: postgres:15-alpine
     container_name: schools_management_db
