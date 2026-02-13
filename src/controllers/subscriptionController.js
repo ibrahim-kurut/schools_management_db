@@ -2,7 +2,8 @@ const {
     createSubscriptionRequestService,
     getSubscriptionRequestsService,
     approveSubscriptionService,
-    rejectSubscriptionService
+    rejectSubscriptionService,
+    getPendingRequestsCountService
 } = require("../services/subscriptionService");
 const {
     createSubscriptionRequestSchema,
@@ -17,8 +18,8 @@ const {
  */
 exports.createSubscriptionRequestController = async (req, res) => {
     try {
-        // Validate request body
-        const { error } = createSubscriptionRequestSchema.validate(req.body);
+        // Validate request body and convert values (trim, etc.)
+        const { error, value } = createSubscriptionRequestSchema.validate(req.body, { convert: true });
         if (error) {
             return res.status(400).json({
                 success: false,
@@ -26,7 +27,7 @@ exports.createSubscriptionRequestController = async (req, res) => {
             });
         }
 
-        const { planId, paymentReceipt } = req.body;
+        const { planId, paymentReceipt } = value;
         const schoolId = req.user.schoolId;
 
         if (!schoolId) {
@@ -141,6 +142,26 @@ exports.rejectSubscriptionController = async (req, res) => {
             data: result
         });
 
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+/**
+ * @description Get pending requests count (Super Admin)
+ * @route GET /api/subscriptions/requests/count
+ * @access private (Super Admin only)
+ */
+exports.getPendingRequestsCountController = async (req, res) => {
+    try {
+        const count = await getPendingRequestsCountService();
+        res.status(200).json({
+            success: true,
+            data: { count }
+        });
     } catch (error) {
         res.status(400).json({
             success: false,

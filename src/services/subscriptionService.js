@@ -58,7 +58,8 @@ exports.createSubscriptionRequestService = async (schoolId, planId, paymentRecei
         redis.del('subscription-requests-all'),
         redis.del('subscription-requests-PENDING'),
         redis.del('subscription-requests-APPROVED'),
-        redis.del('subscription-requests-REJECTED')
+        redis.del('subscription-requests-REJECTED'),
+        redis.del('subscription-requests-count')
     ]);
 
     return newRequest;
@@ -177,7 +178,8 @@ exports.approveSubscriptionService = async (requestId, adminNotes) => {
         redis.del('subscription-requests-all'),
         redis.del('subscription-requests-PENDING'),
         redis.del('subscription-requests-APPROVED'),
-        redis.del('subscription-requests-REJECTED')
+        redis.del('subscription-requests-REJECTED'),
+        redis.del('subscription-requests-count')
     ]);
 
     return result;
@@ -218,8 +220,33 @@ exports.rejectSubscriptionService = async (requestId, adminNotes) => {
         redis.del('subscription-requests-all'),
         redis.del('subscription-requests-PENDING'),
         redis.del('subscription-requests-APPROVED'),
-        redis.del('subscription-requests-REJECTED')
+        redis.del('subscription-requests-REJECTED'),
+        redis.del('subscription-requests-count')
     ]);
 
     return updatedRequest;
+};
+/**
+ * @description Get the count of pending subscription requests (Super Admin)
+ * @route /api/subscriptions/requests/count
+ * @method GET
+ * @access private (Super Admin only)
+ */
+exports.getPendingRequestsCountService = async () => {
+    // Check cache first
+    const cacheKey = 'subscription-requests-count';
+    const cachedCount = await redis.get(cacheKey);
+    if (cachedCount !== null) {
+        return parseInt(cachedCount);
+    }
+
+    // Fetch from database
+    const count = await prisma.subscriptionRequest.count({
+        where: { status: "PENDING" }
+    });
+
+    // Cache for 5 minutes
+    await redis.set(cacheKey, count.toString(), 'EX', 300);
+
+    return count;
 };
