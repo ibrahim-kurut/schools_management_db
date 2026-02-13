@@ -173,8 +173,9 @@ model School {
   // Academic Years
   academicYears AcademicYear[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  subscriptionRequests SubscriptionRequest[]
 }
 
 // --------------------------------------
@@ -182,17 +183,18 @@ model School {
 // --------------------------------------
 
 model Plan {
-  id             String         @id @default(uuid())
-  name           String         @unique
-  description    String?
-  price          Float          @default(0)
-  maxStudents    Int            @default(50)
-  maxTeachers    Int            @default(10)
-  allowReports   Boolean        @default(false)
-  storageLimit   Int            @default(100)
-  durationInDays Int            @default(30)
-  subscriptions  Subscription[]
-  createdAt      DateTime       @default(now())
+  id                   String                @id @default(uuid())
+  name                 String                @unique
+  description          String?
+  price                Float                 @default(0)
+  maxStudents          Int                   @default(50)
+  maxTeachers          Int                   @default(10)
+  allowReports         Boolean               @default(false)
+  storageLimit         Int                   @default(100)
+  durationInDays       Int                   @default(30)
+  subscriptions        Subscription[]
+  createdAt            DateTime              @default(now())
+  subscriptionRequests SubscriptionRequest[]
 }
 
 model Subscription {
@@ -209,8 +211,35 @@ model Subscription {
 }
 
 // --------------------------------------
-// Academic Year Module
+// Subscription Request
 // --------------------------------------
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SubscriptionRequest {
+  id String @id @default(uuid())
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status RequestStatus @default(PENDING)
+
+  adminNotes     String?
+  paymentReceipt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([status])
+}
 
 model AcademicYear {
   id        String   @id @default(uuid())
