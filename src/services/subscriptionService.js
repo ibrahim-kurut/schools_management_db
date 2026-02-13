@@ -53,5 +53,59 @@ exports.createSubscriptionRequestService = async (schoolId, planId, paymentRecei
         }
     });
 
+    // 4. Invalidate cache to ensure fresh data
+    await Promise.all([
+        redis.del('subscription-requests-all'),
+        redis.del('subscription-requests-PENDING'),
+        redis.del('subscription-requests-APPROVED'),
+        redis.del('subscription-requests-REJECTED')
+    ]);
+
     return newRequest;
 };
+
+/**
+ * @description Get subscription requests (Super Admin)
+ * @route /api/subscriptions/requests
+ * @method GET
+ * @access private (Super Admin only)
+ */
+exports.getSubscriptionRequestsService = async (status) => {
+    // Build where clause based on status filter
+    const where = status ? { status } : {};
+
+    // Check cache first
+    const cacheKey = `subscription-requests-${status || 'all'}`;
+    const cachedRequests = await redis.get(cacheKey);
+    if (cachedRequests) {
+        return JSON.parse(cachedRequests);
+    }
+
+    // Fetch from database
+    const requests = await prisma.subscriptionRequest.findMany({
+        where,
+        include: {
+            school: {
+                select: {
+                    name: true,
+                    phone: true
+                }
+            },
+            plan: {
+                select: {
+                    name: true,
+                    price: true,
+                    durationInDays: true
+                }
+            }
+        },
+        orderBy: {
+            createdAt: "desc"
+        }
+    });
+
+    // Cache for 5 minutes (300 seconds)
+    await redis.set(cacheKey, JSON.stringify(requests), 'EX', 300);
+
+    return requests;
+}

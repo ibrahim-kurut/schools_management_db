@@ -1,4 +1,4 @@
-const { createSubscriptionRequestService } = require("../services/subscriptionService");
+const { createSubscriptionRequestService, getSubscriptionRequestsService } = require("../services/subscriptionService");
 const { createSubscriptionRequestSchema } = require("../utils/subscriptionValidate");
 
 /**
@@ -42,3 +42,31 @@ exports.createSubscriptionRequestController = async (req, res) => {
         });
     }
 };
+
+
+/**
+ * @description Get a subscriptions requests
+ * @route /api/subscriptions/requests
+ * @method GET
+ * @access private (Super Admin only)
+ */
+
+exports.getSubscriptionRequestsController = async (req, res) => {
+    try {
+        const { status } = req.query; // Optional: ?status=PENDING
+
+        const requests = await getSubscriptionRequestsService(status);
+
+        res.status(200).json({
+            success: true,
+            message: "Subscription requests retrieved successfully",
+            data: requests,
+            count: requests.length
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
