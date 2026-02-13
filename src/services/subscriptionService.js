@@ -109,3 +109,117 @@ exports.getSubscriptionRequestsService = async (status) => {
 
     return requests;
 }
+
+/**
+ * @description Approve a subscription request (Super Admin)
+ * @route /api/subscriptions/approve/:id
+ * @method POST
+ * @access private (Super Admin only)
+ */
+exports.approveSubscriptionService = async (requestId, adminNotes) => {
+    // 1. Find the subscription request
+    const request = await prisma.subscriptionRequest.findUnique({
+        where: { id: requestId },
+        include: {
+            plan: true,
+            school: true
+        }
+    });
+
+    if (!request) {
+        throw new Error("Subscription request not found");
+    }
+
+    // 2. Check if already processed
+    if (request.status !== "PENDING") {
+        throw new Error(`Request already ${request.status.toLowerCase()}`);
+    }
+
+    // 3. Calculate subscription dates
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + request.plan.durationInDays);
+
+    // 4. Use transaction to update request and create/update subscription
+    const result = await prisma.$transaction(async (tx) => {
+        // Update the request status
+        const updatedRequest = await tx.subscriptionRequest.update({
+            where: { id: requestId },
+            data: {
+                status: "APPROVED",
+                adminNotes: adminNotes || null
+            }
+        });
+
+        // Create or update the subscription
+        const subscription = await tx.subscription.upsert({
+            where: { schoolId: request.schoolId },
+            update: {
+                planId: request.planId,
+                startDate,
+                endDate,
+                status: "ACTIVE"
+            },
+            create: {
+                schoolId: request.schoolId,
+                planId: request.planId,
+                startDate,
+                endDate,
+                status: "ACTIVE"
+            }
+        });
+
+        return { updatedRequest, subscription };
+    });
+
+    // 5. Invalidate cache
+    await Promise.all([
+        redis.del('subscription-requests-all'),
+        redis.del('subscription-requests-PENDING'),
+        redis.del('subscription-requests-APPROVED'),
+        redis.del('subscription-requests-REJECTED')
+    ]);
+
+    return result;
+};
+
+/**
+ * @description Reject a subscription request (Super Admin)
+ * @route /api/subscriptions/reject/:id
+ * @method POST
+ * @access private (Super Admin only)
+ */
+exports.rejectSubscriptionService = async (requestId, adminNotes) => {
+    // 1. Find the subscription request
+    const request = await prisma.subscriptionRequest.findUnique({
+        where: { id: requestId }
+    });
+
+    if (!request) {
+        throw new Error("Subscription request not found");
+    }
+
+    // 2. Check if already processed
+    if (request.status !== "PENDING") {
+        throw new Error(`Request already ${request.status.toLowerCase()}`);
+    }
+
+    // 3. Update the request status to REJECTED
+    const updatedRequest = await prisma.subscriptionRequest.update({
+        where: { id: requestId },
+        data: {
+            status: "REJECTED",
+            adminNotes
+        }
+    });
+
+    // 4. Invalidate cache
+    await Promise.all([
+        redis.del('subscription-requests-all'),
+        redis.del('subscription-requests-PENDING'),
+        redis.del('subscription-requests-APPROVED'),
+        redis.del('subscription-requests-REJECTED')
+    ]);
+
+    return updatedRequest;
+};
