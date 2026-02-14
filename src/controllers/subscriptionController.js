@@ -97,7 +97,7 @@ exports.approveSubscriptionController = async (req, res) => {
         }
 
         const { id } = req.params;
-        const { adminNotes } = value; // Use validated & converted value
+        const { adminNotes } = value || {}; // Use validated & converted value
 
         const result = await approveSubscriptionService(id, adminNotes);
 
@@ -132,7 +132,7 @@ exports.rejectSubscriptionController = async (req, res) => {
         }
 
         const { id } = req.params;
-        const { adminNotes } = value; // Use validated & converted value
+        const { adminNotes } = value || {}; // Use validated & converted value
 
         const result = await rejectSubscriptionService(id, adminNotes);
 
