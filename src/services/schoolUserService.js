@@ -85,10 +85,18 @@ exports.addMemberService = async (requesterId, memberData) => {
             role: memberRole,
             schoolId: school.id,
             // classId is set only for STUDENT, otherwise null
-            ...(memberRole === "STUDENT" && { classId: targetClassId })
+            ...(memberRole === "STUDENT" && {
+                classId: targetClassId,
+                studentProfile: {
+                    create: {} // Create an empty student profile
+                }
+            })
         },
         include: {
-            ...(memberRole === "STUDENT" && { class: true })
+            ...(memberRole === "STUDENT" && {
+                class: true,
+                studentProfile: true
+            })
         }
     });
 
@@ -206,6 +214,12 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
                     id: true,
                     name: true,
                     tuitionFee: true
+                }
+            },
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    discountNotes: true
                 }
             },
         }

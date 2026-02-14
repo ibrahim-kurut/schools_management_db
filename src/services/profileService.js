@@ -14,6 +14,7 @@ exports.getUserProfileService = async (userId) => {
             include: {
                 school: true,
                 class: true,
+                studentProfile: true,
                 // for student
                 gradesAsStudent: { include: { subject: true } },
                 paymentsMade: true,
@@ -49,10 +50,27 @@ exports.getUserProfileService = async (userId) => {
         // Role-based data filtering
         if (user.role === 'STUDENT') {
             const { salariesReceived, subjects, ...studentProfile } = userData;
+
+            // Calculate financial summary
+            const tuitionFee = user.class?.tuitionFee || 0;
+            const discount = user.studentProfile?.discountAmount || 0;
+            const netRequired = tuitionFee - discount;
+            const totalPaid = (user.paymentsMade || []).reduce((sum, p) => p.status === 'COMPLETED' ? sum + p.amount : sum, 0);
+            const remainingBalance = netRequired - totalPaid;
+
             return {
                 status: "SUCCESS",
                 message: "Student profile retrieved",
-                user: studentProfile
+                user: {
+                    ...studentProfile,
+                    financialSummary: {
+                        totalTuitionFee: tuitionFee,
+                        discountAmount: discount,
+                        netRequired: netRequired,
+                        totalPaid: totalPaid,
+                        remainingBalance: remainingBalance
+                    }
+                }
             };
         } else if (user.role === 'TEACHER') {
             const { gradesAsStudent, paymentsMade, ...teacherProfile } = userData;

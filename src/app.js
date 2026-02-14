@@ -15,4 +15,5 @@ app.use('/api/academic-year', require('./routes/academicYearRoutes'));
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/grades', require('./routes/gradesRoutes'));
 app.use('/api/subscriptions', require('./routes/subscriptionRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
 module.exports = app;
