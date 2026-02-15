@@ -16,4 +16,8 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/grades', require('./routes/gradesRoutes'));
 app.use('/api/subscriptions', require('./routes/subscriptionRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+
+// Error Handler Middleware (Must be last)
+app.use(require('./middleware/errorHandler'));
+
 module.exports = app;
