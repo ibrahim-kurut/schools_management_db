@@ -39,3 +39,61 @@ exports.updateStudentDiscountService = async (requesterId, studentId, { discount
         }
     });
 };
+
+/**
+ * @description create a new payment
+ * @access private (Accountant)
+ */
+exports.createPaymentService = async (requester, { studentId, amount, date, paymentType, status, note }) => {
+
+    // 1. Verify student exists, is really a STUDENT, and belongs to the SAME school
+    // optimization: select only necessary fields + school slug for invoice
+    const student = await prisma.user.findFirst({
+        where: {
+            id: studentId,
+            role: "STUDENT",
+            schoolId: requester.schoolId
+        },
+        select: {
+            id: true,
+            school: {
+                select: { slug: true } // Fetch slug for invoice prefix
+            }
+        }
+    });
+
+    if (!student) {
+        throw new Error("Student not found or does not belong to your school");
+    }
+
+    // Helper to generate Invoice Number (e.g. SCH-123456)
+    const generateInvoiceNumber = (prefix) => {
+        return `${prefix.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    };
+
+    // 2. Create Payment
+    const payment = await prisma.payment.create({
+        data: {
+            studentId,
+            schoolId: requester.schoolId,
+            recordedById: requester.id,
+            amount: parseFloat(amount),
+            date: date ? new Date(date) : new Date(),
+            paymentType,
+            status: status || "COMPLETED",
+            note,
+            invoiceNumber: generateInvoiceNumber(student.school.slug.slice(0, 3)) // Use first 3 chars of slug
+        }
+    });
+
+    // 3. Get Recorder Name
+    const recorder = await prisma.user.findUnique({
+        where: { id: requester.id },
+        select: { firstName: true, lastName: true }
+    });
+
+    return {
+        ...payment,
+        recordedByName: recorder ? `${recorder.firstName} ${recorder.lastName}` : "Unknown"
+    };
+};

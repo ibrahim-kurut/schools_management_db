@@ -1,5 +1,6 @@
-const { updateStudentDiscountService } = require("../services/paymentService");
+const { updateStudentDiscountService, createPaymentService } = require("../services/paymentService");
 const asyncHandler = require("../utils/asyncHandler");
+const { createPaymentSchema } = require("../utils/paymentValidate");
 
 
 /**
@@ -24,3 +25,42 @@ exports.updateStudentDiscountController = asyncHandler(async (req, res) => {
         data: updatedProfile
     });
 });
+
+/**
+ * @description Create a new payment
+ * @route POST /api/payments
+ * @method POST
+ * @access private (Accountant)
+ */
+
+exports.createPaymentController = asyncHandler(async (req, res) => {
+    // 1. Validate Input
+    const { error } = createPaymentSchema.validate(req.body);
+    if (error) {
+        return res.status(400).json({
+            status: "FAIL",
+            message: error.details[0].message
+        });
+    }
+
+    const requester = req.user;
+    const { studentId, amount, date, paymentType, status, note } = req.body;
+
+    const payment = await createPaymentService(requester, {
+        studentId,
+        amount,
+        date,
+        paymentType,
+        status,
+        note
+    });
+
+    res.status(201).json({
+        status: "SUCCESS",
+        message: "Payment created successfully",
+        data: payment
+    });
+});
+
+
+
