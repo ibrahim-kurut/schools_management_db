@@ -1,4 +1,4 @@
-const { updateStudentDiscountService, createPaymentService } = require("../services/paymentService");
+const { updateStudentDiscountService, createPaymentService, getStudentFinancialRecordService } = require("../services/paymentService");
 const asyncHandler = require("../utils/asyncHandler");
 const { createPaymentSchema } = require("../utils/paymentValidate");
 
@@ -59,6 +59,25 @@ exports.createPaymentController = asyncHandler(async (req, res) => {
         status: "SUCCESS",
         message: "Payment created successfully",
         data: payment
+    });
+});
+
+/**
+ * @description Get student financial record
+ * @route GET /api/payments/financial-record/:studentId
+ * @method GET
+ * @access private (Accountant, School Admin, Student/Parent)
+ */
+exports.getStudentFinancialRecordController = asyncHandler(async (req, res) => {
+    const studentId = req.params.studentId;
+    const requesterId = req.user.id;
+
+    const financialRecord = await getStudentFinancialRecordService(requesterId, studentId);
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Student financial record retrieved successfully",
+        data: financialRecord
     });
 });
 

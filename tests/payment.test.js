@@ -51,14 +51,18 @@ describe('Payment System Tests', () => {
     let schoolId;
     let otherSchoolId;
     let accountantToken;
+    let studentToken;
     let studentId;
     let otherStudentId;
+    let classId;
 
     // Setup
-    beforeAll(async () => {
+    beforeAll(async (timeout = 20000) => {
         // Cleanup
         await prisma.payment.deleteMany({});
+        await prisma.studentProfile.deleteMany({});
         await prisma.user.deleteMany({ where: { email: { in: [accountantUser.email, studentUser.email, otherStudentUser.email] } } });
+        await prisma.class.deleteMany({ where: { schoolId: schoolId } });
         await prisma.school.deleteMany({ where: { name: { in: [testSchool.name, testSchool2.name] } } });
 
         // Create Schools
@@ -80,6 +84,16 @@ describe('Payment System Tests', () => {
             }
         });
         schoolId = school1.id;
+
+        // Create Class with fee
+        const testClass = await prisma.class.create({
+            data: {
+                name: "Grade 10",
+                tuitionFee: 2000,
+                schoolId: schoolId
+            }
+        });
+        classId = testClass.id;
 
         const school2 = await prisma.school.create({
             data: {
@@ -109,12 +123,13 @@ describe('Payment System Tests', () => {
             }
         });
 
-        // Create Student in School 1
+        // Create Student in School 1 with class
         const student = await prisma.user.create({
             data: {
                 ...studentUser,
                 password: await bcrypt.hash(studentUser.password, 10),
-                schoolId: schoolId
+                schoolId: schoolId,
+                classId: classId
             }
         });
         studentId = student.id;
@@ -130,21 +145,31 @@ describe('Payment System Tests', () => {
         otherStudentId = otherStudent.id;
 
         // Login Accountant
-        const logRes = await request(app)
+        const logResAccountant = await request(app)
             .post(`/api/auth/${testSchool.slug}/login`)
             .send({ email: accountantUser.email, password: accountantUser.password });
 
-        if (!logRes.body.userData) {
-            console.error("Login failed:", logRes.body);
-            throw new Error("Login failed during test setup");
-        }
-        accountantToken = logRes.body.userData.token;
+        accountantToken = logResAccountant.body.userData.token;
+
+        // Login Student
+        const logResStudent = await request(app)
+            .post(`/api/auth/${testSchool.slug}/login`)
+            .send({ email: studentUser.email, password: studentUser.password });
+
+        studentToken = logResStudent.body.userData.token;
+    });
+
+    beforeEach(async () => {
+        await prisma.payment.deleteMany({});
+        await prisma.studentProfile.deleteMany({});
     });
 
     afterAll(async () => {
         // Cleanup
         await prisma.payment.deleteMany({});
+        await prisma.studentProfile.deleteMany({});
         await prisma.user.deleteMany({ where: { email: { in: [accountantUser.email, studentUser.email, otherStudentUser.email, "owner_pay_1@example.com", "owner_pay_2@example.com"] } } });
+        await prisma.class.deleteMany({ where: { schoolId: schoolId } });
         await prisma.school.deleteMany({ where: { name: { in: [testSchool.name, testSchool2.name] } } });
         await prisma.$disconnect();
     });
@@ -231,6 +256,117 @@ describe('Payment System Tests', () => {
                 .set('Authorization', `Bearer ${accountantToken}`) // Accountant from School 1
                 .send(paymentData)
                 .expect(500); // Service throws "Student not found or does not belong..."
+        });
+    });
+
+    describe('GET /api/payments/financial-record/:studentId', () => {
+        it('should accurately calculate financial record with discount and multiple payments', async () => {
+            // 1. Add a discount for the student
+            await prisma.studentProfile.create({
+                data: {
+                    userId: studentId,
+                    discountAmount: 300,
+                    discountNotes: "Excellent student scholarship"
+                }
+            });
+
+            // 2. Add two tuition payments
+            // Payment 1: 500
+            await prisma.payment.create({
+                data: {
+                    studentId,
+                    schoolId,
+                    amount: 500,
+                    paymentType: "TUITION",
+                    status: "COMPLETED",
+                    recordedById: null // Not needed for this check
+                }
+            });
+
+            // Payment 2: 200
+            await prisma.payment.create({
+                data: {
+                    studentId,
+                    schoolId,
+                    amount: 200,
+                    paymentType: "TUITION",
+                    status: "COMPLETED"
+                }
+            });
+
+            // 3. Add a non-tuition payment (should not affect balance)
+            await prisma.payment.create({
+                data: {
+                    studentId,
+                    schoolId,
+                    amount: 150,
+                    paymentType: "BOOKS",
+                    status: "COMPLETED"
+                }
+            });
+
+            // Math: 
+            // Fee: 2000 (from class)
+            // Discount: 300
+            // Net Required: 1700
+            // Total Tuition Paid: 500 + 200 = 700
+            // Remaining: 1000
+
+            const res = await request(app)
+                .get(`/api/payments/financial-record/${studentId}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            const summary = res.body.data.summary;
+            expect(summary.totalTuitionFee).toBe(2000);
+            expect(summary.discountAmount).toBe(300);
+            expect(summary.netRequired).toBe(1700);
+            expect(summary.totalPaid).toBe(700);
+            expect(summary.remainingBalance).toBe(1000);
+            expect(res.body.data.paymentHistory.length).toBe(2); // Only TUITION payments
+        });
+
+        it('should allow a student to view their own record', async () => {
+            const res = await request(app)
+                .get(`/api/payments/financial-record/${studentId}`)
+                .set('Authorization', `Bearer ${studentToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.studentName).toContain(studentUser.firstName);
+        });
+
+        it('should deny a student from viewing another student record', async () => {
+            // Create another student in same school to test identity check
+            const secondStudentInSameSchool = await prisma.user.create({
+                data: {
+                    firstName: "Second",
+                    lastName: "Student",
+                    email: "second@example.com",
+                    password: "Pass",
+                    role: "STUDENT",
+                    gender: "FEMALE",
+                    birthDate: new Date(),
+                    schoolId: schoolId
+                }
+            });
+
+            const res = await request(app)
+                .get(`/api/payments/financial-record/${secondStudentInSameSchool.id}`)
+                .set('Authorization', `Bearer ${studentToken}`) // Logged in as first student
+                .expect(500); // Service throws "Access denied: You can only view your own..."
+
+            expect(res.body.message).toMatch(/Access denied/);
+        });
+
+        it('should fail if student belongs to another school', async () => {
+            const res = await request(app)
+                .get(`/api/payments/financial-record/${otherStudentId}`)
+                .set('Authorization', `Bearer ${accountantToken}`) // School 1 accountant
+                .expect(500);
+
+            expect(res.body.message).toMatch(/You do not have permission/);
         });
     });
 

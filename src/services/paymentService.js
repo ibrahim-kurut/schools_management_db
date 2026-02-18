@@ -97,3 +97,91 @@ exports.createPaymentService = async (requester, { studentId, amount, date, paym
         recordedByName: recorder ? `${recorder.firstName} ${recorder.lastName}` : "Unknown"
     };
 };
+
+/**
+ * @description Get student financial record summary
+ * @access private (Accountant, School Admin, Student/Parent)
+ */
+exports.getStudentFinancialRecordService = async (requesterId, studentId) => {
+    // 1. Fetch Requester info
+    const requester = await prisma.user.findUnique({
+        where: { id: requesterId },
+        select: { id: true, schoolId: true, role: true }
+    });
+
+    if (!requester) throw new Error("Requester not found");
+
+    // 2. Fetch Student with all necessary financial relations
+    const student = await prisma.user.findUnique({
+        where: { id: studentId },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            schoolId: true,
+            class: {
+                select: {
+                    name: true,
+                    tuitionFee: true
+                }
+            },
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    discountNotes: true
+                }
+            },
+            paymentsMade: {
+                where: {
+                    paymentType: "TUITION",
+                    status: "COMPLETED"
+                },
+                select: {
+                    id: true,
+                    amount: true,
+                    date: true,
+                    invoiceNumber: true,
+                    note: true
+                },
+                orderBy: { date: 'desc' }
+            }
+        }
+    });
+
+    if (!student || student.role !== "STUDENT") {
+        throw new Error("Student not found");
+    }
+
+    // 3. Security Check
+    // 3a. Same School Check
+    if (student.schoolId !== requester.schoolId) {
+        throw new Error("You do not have permission to view this student's record");
+    }
+
+    // 3b. Role-based Identity Check (Students can only see their own record)
+    if (requester.role === "STUDENT" && requester.id !== studentId) {
+        throw new Error("Access denied: You can only view your own financial record");
+    }
+
+    // 4. Calculations
+    const classFee = student.class?.tuitionFee || 0;
+    const discount = student.studentProfile?.discountAmount || 0;
+    const netRequired = classFee - discount;
+
+    const totalPaid = student.paymentsMade.reduce((sum, p) => sum + p.amount, 0);
+    const balance = netRequired - totalPaid;
+
+    return {
+        studentName: `${student.firstName} ${student.lastName}`,
+        className: student.class?.name || "Not Assigned",
+        summary: {
+            totalTuitionFee: classFee,
+            discountAmount: discount,
+            netRequired: netRequired,
+            totalPaid: totalPaid,
+            remainingBalance: balance
+        },
+        paymentHistory: student.paymentsMade
+    };
+};
