@@ -370,4 +370,68 @@ describe('Payment System Tests', () => {
         });
     });
 
+    describe('PUT /api/payments/:id', () => {
+        let paymentToUpdateId;
+
+        beforeEach(async () => {
+            const payment = await prisma.payment.create({
+                data: {
+                    studentId,
+                    schoolId,
+                    amount: 1000,
+                    paymentType: "TUITION",
+                    recordedById: null
+                }
+            });
+            paymentToUpdateId = payment.id;
+        });
+
+        it('should successfully update a payment', async () => {
+            const updateData = {
+                amount: 1200,
+                note: "Updated note"
+            };
+
+            const res = await request(app)
+                .put(`/api/payments/${paymentToUpdateId}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send(updateData)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.amount).toBe(1200);
+            expect(res.body.data.note).toBe("Updated note");
+        });
+
+        it('should fail if payment is from another school', async () => {
+            // Create a payment in school 2
+            const otherSchoolPayment = await prisma.payment.create({
+                data: {
+                    studentId: otherStudentId,
+                    schoolId: otherSchoolId,
+                    amount: 500,
+                    paymentType: "TUITION"
+                }
+            });
+
+            const res = await request(app)
+                .put(`/api/payments/${otherSchoolPayment.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`) // School 1 accountant
+                .send({ amount: 600 })
+                .expect(500);
+
+            expect(res.body.message).toMatch(/You do not have permission/);
+        });
+
+        it('should fail validation with invalid amount', async () => {
+            const res = await request(app)
+                .put(`/api/payments/${paymentToUpdateId}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send({ amount: -50 })
+                .expect(400);
+
+            expect(res.body.message).toMatch(/Amount must be a positive value/);
+        });
+    });
+
 });

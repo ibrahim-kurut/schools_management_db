@@ -185,3 +185,41 @@ exports.getStudentFinancialRecordService = async (requesterId, studentId) => {
         paymentHistory: student.paymentsMade
     };
 };
+
+/**
+ * @description Update an existing payment
+ * @access private (Accountant, School Admin)
+ */
+exports.updatePaymentService = async (requester, paymentId, updateData) => {
+    // 1. Find payment and verify schoolId
+    const existingPayment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: { schoolId: true, status: true }
+    });
+
+    if (!existingPayment) {
+        throw new Error("Payment record not found");
+    }
+
+    if (existingPayment.schoolId !== requester.schoolId) {
+        throw new Error("You do not have permission to update this payment");
+    }
+
+    if (existingPayment.status === "CANCELLED") {
+        throw new Error("Cannot update a cancelled payment");
+    }
+
+    // 2. Perform Update
+    const { amount, date, paymentType, note, status } = updateData;
+
+    return await prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+            amount: amount !== undefined ? parseFloat(amount) : undefined,
+            date: date ? new Date(date) : undefined,
+            paymentType,
+            status,
+            note
+        }
+    });
+};

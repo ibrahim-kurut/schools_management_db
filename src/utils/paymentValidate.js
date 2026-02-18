@@ -33,6 +33,32 @@ const createPaymentSchema = Joi.object({
     note: Joi.string().trim().optional()
 });
 
+const updatePaymentSchema = Joi.object({
+    amount: Joi.number().positive().optional()
+        .messages({
+            'number.base': 'Amount must be a number',
+            'number.positive': 'Amount must be a positive value'
+        }),
+
+    date: Joi.date().optional()
+        .messages({
+            'date.base': 'Date must be a valid date format'
+        }),
+
+    paymentType: Joi.string().valid("TUITION", "TRANSPORT", "BOOKS", "UNIFORM", "ACTIVITIES", "OTHER").optional()
+        .messages({
+            'any.only': 'Payment type must be one of: TUITION, TRANSPORT, BOOKS, UNIFORM, ACTIVITIES, OTHER'
+        }),
+
+    status: Joi.string().valid("PENDING", "COMPLETED", "CANCELLED").optional()
+        .messages({
+            'any.only': 'Status must be one of: PENDING, COMPLETED, CANCELLED'
+        }),
+
+    note: Joi.string().trim().optional()
+});
+
 module.exports = {
-    createPaymentSchema
+    createPaymentSchema,
+    updatePaymentSchema
 };

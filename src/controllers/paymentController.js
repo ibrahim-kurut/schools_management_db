@@ -1,6 +1,6 @@
-const { updateStudentDiscountService, createPaymentService, getStudentFinancialRecordService } = require("../services/paymentService");
+const { updateStudentDiscountService, createPaymentService, getStudentFinancialRecordService, updatePaymentService } = require("../services/paymentService");
 const asyncHandler = require("../utils/asyncHandler");
-const { createPaymentSchema } = require("../utils/paymentValidate");
+const { createPaymentSchema, updatePaymentSchema } = require("../utils/paymentValidate");
 
 
 /**
@@ -78,6 +78,34 @@ exports.getStudentFinancialRecordController = asyncHandler(async (req, res) => {
         status: "SUCCESS",
         message: "Student financial record retrieved successfully",
         data: financialRecord
+    });
+});
+
+/**
+ * @description Update payment record
+ * @route PUT /api/payments/:id
+ * @method PUT
+ * @access private (Accountant, School Admin)
+ */
+exports.updatePaymentController = asyncHandler(async (req, res) => {
+    // 1. Validate Input
+    const { error } = updatePaymentSchema.validate(req.body);
+    if (error) {
+        return res.status(400).json({
+            status: "FAIL",
+            message: error.details[0].message
+        });
+    }
+
+    const paymentId = req.params.id;
+    const requester = req.user;
+
+    const updatedPayment = await updatePaymentService(requester, paymentId, req.body);
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Payment updated successfully",
+        data: updatedPayment
     });
 });
 
