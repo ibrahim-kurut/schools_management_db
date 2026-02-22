@@ -47,3 +47,40 @@ exports.createExpenseService = async (requester, expenseData) => {
 
     return expense;
 };
+
+/**
+ * @description get all expenses
+ * @access private (Accountant or School Admin)
+ */
+exports.getAllExpensesService = async (requester) => {
+    const expenses = await prisma.expense.findMany({
+        where: {
+            schoolId: requester.schoolId,
+        },
+        select: {
+            id: true,
+            title: true,
+            amount: true,
+            date: true,
+            type: true,
+            recipientId: true,
+            recordedById: true,
+
+            recipient: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                }
+            },
+            recordedBy: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                }
+            },
+        },
+    });
+    return expenses;
+};
