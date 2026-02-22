@@ -42,6 +42,9 @@ enum ExpenseType {
   SALARY
   MAINTENANCE
   SUPPLIES
+  RENT
+  UTILITIES
+  MARKETING
   OTHER
 }
 
