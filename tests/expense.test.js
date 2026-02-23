@@ -230,4 +230,88 @@ describe('Expense Management System Tests', () => {
                 .expect(403);
         });
     });
+
+    describe('GET /api/expenses', () => {
+        it('should fetch expenses with pagination', async () => {
+            const acc = await prisma.user.findFirst({ where: { role: "ACCOUNTANT", schoolId } });
+            // Create some dummy expenses for testing pagination (we have 2 already)
+            await prisma.expense.createMany({
+                data: Array.from({ length: 3 }, (_, i) => ({
+                    title: `Pagination Test Expense ${i + 1}`,
+                    amount: 50 + i,
+                    type: "OTHER",
+                    schoolId: schoolId,
+                    recordedById: acc.id
+                }))
+            });
+
+            const res = await request(app)
+                .get('/api/expenses?page=1&limit=2')
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.length).toBe(2);
+            expect(res.body.pagination).toBeDefined();
+            expect(res.body.pagination.total).toBeGreaterThanOrEqual(5);
+            expect(res.body.pagination.page).toBe(1);
+            expect(res.body.pagination.limit).toBe(2);
+        });
+
+        it('should default to page 1 and limit 10 if not provided', async () => {
+            const res = await request(app)
+                .get('/api/expenses')
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.pagination.page).toBe(1);
+            expect(res.body.pagination.limit).toBe(10);
+        });
+    });
+
+    describe('GET /api/expenses/:id', () => {
+        it('should successfully fetch an expense by id', async () => {
+            const expense = await prisma.expense.findFirst({
+                where: { schoolId: schoolId }
+            });
+
+            const res = await request(app)
+                .get(`/api/expenses/${expense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.id).toBe(expense.id);
+            expect(res.body.data.recipient).toBeDefined();
+            expect(res.body.data.recordedBy).toBeDefined();
+        });
+
+        it('should return 404 if expense not found', async () => {
+            const res = await request(app)
+                .get('/api/expenses/00000000-0000-0000-0000-000000000000') // UUID that doesn't exist
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(404);
+
+            expect(res.body.status).toBe("FAIL");
+        });
+
+        it('should return 404 if expense belongs to another school', async () => {
+            const otherAcc = await prisma.user.findFirst({ where: { schoolId: otherSchoolId } });
+            const otherExpense = await prisma.expense.create({
+                data: {
+                    title: "Other School Expense",
+                    amount: 100,
+                    type: "OTHER",
+                    schoolId: otherSchoolId,
+                    recordedById: otherAcc.id
+                }
+            });
+
+            const res = await request(app)
+                .get(`/api/expenses/${otherExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`) // Accountant from first school
+                .expect(404);
+        });
+    });
 });

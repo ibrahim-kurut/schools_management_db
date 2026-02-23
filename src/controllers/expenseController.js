@@ -1,4 +1,4 @@
-const { createExpenseService, getAllExpensesService } = require("../services/expenseService");
+const { createExpenseService, getAllExpensesService, getExpenseByIdService } = require("../services/expenseService");
 const asyncHandler = require("../utils/asyncHandler");
 const { createExpenseSchema } = require("../utils/expenseValidate");
 
@@ -38,11 +38,40 @@ exports.createExpenseController = asyncHandler(async (req, res) => {
  * @access private (school admin, teacher)
  */
 exports.getAllExpensesController = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
     const requester = req.user;
-    const expenses = await getAllExpensesService(requester);
+
+    const result = await getAllExpensesService(requester, parseInt(page), parseInt(limit));
+
     res.status(200).json({
         status: "SUCCESS",
         message: "Expenses fetched successfully",
-        data: expenses,
+        data: result.expenses,
+        pagination: result.pagination
+    });
+});
+
+/**
+ * @description get expense by id
+ * @route  /api/expenses/:id
+ * @method GET
+ * @access private (school admin, teacher)
+ */
+exports.getExpenseByIdController = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const requester = req.user;
+    const expense = await getExpenseByIdService(requester, id);
+
+    if (!expense) {
+        return res.status(404).json({
+            status: "FAIL",
+            message: "Expense record not found"
+        });
+    }
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Expense fetched successfully",
+        data: expense,
     });
 });

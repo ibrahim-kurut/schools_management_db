@@ -49,12 +49,69 @@ exports.createExpenseService = async (requester, expenseData) => {
 };
 
 /**
- * @description get all expenses
+ * @description get all expenses with pagination
  * @access private (Accountant or School Admin)
  */
-exports.getAllExpensesService = async (requester) => {
-    const expenses = await prisma.expense.findMany({
+exports.getAllExpensesService = async (requester, page = 1, limit = 10) => {
+    const skip = (page - 1) * limit;
+
+    const [expenses, total] = await Promise.all([
+        prisma.expense.findMany({
+            where: {
+                schoolId: requester.schoolId,
+            },
+            skip: skip,
+            take: parseInt(limit),
+            orderBy: { date: 'desc' },
+            select: {
+                id: true,
+                title: true,
+                amount: true,
+                date: true,
+                type: true,
+                recipientId: true,
+                recordedById: true,
+
+                recipient: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                    }
+                },
+                recordedBy: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                    }
+                },
+            },
+        }),
+        prisma.expense.count({
+            where: { schoolId: requester.schoolId }
+        })
+    ]);
+
+    return {
+        expenses,
+        pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(total / limit)
+        }
+    };
+};
+
+/**
+ * @description get expense by id
+ * @access private (Accountant or School Admin)
+ */
+exports.getExpenseByIdService = async (requester, id) => {
+    const expense = await prisma.expense.findUnique({
         where: {
+            id,
             schoolId: requester.schoolId,
         },
         select: {
@@ -82,5 +139,5 @@ exports.getAllExpensesService = async (requester) => {
             },
         },
     });
-    return expenses;
+    return expense;
 };
