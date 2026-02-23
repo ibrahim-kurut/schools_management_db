@@ -1,6 +1,6 @@
-const { createExpenseService, getAllExpensesService, getExpenseByIdService } = require("../services/expenseService");
+const { createExpenseService, getAllExpensesService, getExpenseByIdService, updateExpenseService } = require("../services/expenseService");
 const asyncHandler = require("../utils/asyncHandler");
-const { createExpenseSchema } = require("../utils/expenseValidate");
+const { createExpenseSchema, updateExpenseSchema } = require("../utils/expenseValidate");
 
 
 /**
@@ -11,7 +11,7 @@ const { createExpenseSchema } = require("../utils/expenseValidate");
  */
 exports.createExpenseController = asyncHandler(async (req, res) => {
     // 1. Validate Input
-    const { error } = createExpenseSchema.validate(req.body);
+    const { error, value } = createExpenseSchema.validate(req.body);
     if (error) {
         return res.status(400).json({
             status: "FAIL",
@@ -19,10 +19,9 @@ exports.createExpenseController = asyncHandler(async (req, res) => {
         });
     }
 
-    const { title, amount, date, type, recipientId } = req.body;
     const requester = req.user;
     // 2. call service and pass the requester and the expense data
-    const expense = await createExpenseService(requester, { title, amount, date, type, recipientId });
+    const expense = await createExpenseService(requester, value);
 
     res.status(201).json({
         status: "SUCCESS",
@@ -73,5 +72,34 @@ exports.getExpenseByIdController = asyncHandler(async (req, res) => {
         status: "SUCCESS",
         message: "Expense fetched successfully",
         data: expense,
+    });
+});
+
+/**
+ * @description Update expense
+ * @route  /api/expenses/:id
+ * @method PUT
+ * @access private (Accountant, School Admin)
+ */
+exports.updateExpenseController = asyncHandler(async (req, res) => {
+    // 1. Validate Input
+    const { error, value } = updateExpenseSchema.validate(req.body);
+    if (error) {
+        return res.status(400).json({
+            status: "FAIL",
+            message: error.details[0].message
+        });
+    }
+
+    const { id } = req.params;
+    const requester = req.user;
+
+    // 2. Call service
+    const updatedExpense = await updateExpenseService(requester, id, value);
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Expense updated successfully",
+        data: updatedExpense,
     });
 });

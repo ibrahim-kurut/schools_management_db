@@ -314,4 +314,80 @@ describe('Expense Management System Tests', () => {
                 .expect(404);
         });
     });
+
+    describe('PUT /api/expenses/:id', () => {
+        let testExpense;
+
+        beforeEach(async () => {
+            testExpense = await prisma.expense.create({
+                data: {
+                    title: "Update Test Expense",
+                    amount: 500,
+                    type: "MAINTENANCE",
+                    schoolId: schoolId,
+                    recordedById: (await prisma.user.findFirst({ where: { role: "ACCOUNTANT", schoolId } })).id
+                }
+            });
+        });
+
+        it('should successfully update an expense title and amount', async () => {
+            const updateData = {
+                title: "Updated Title",
+                amount: 600
+            };
+
+            const res = await request(app)
+                .put(`/api/expenses/${testExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send(updateData)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.title).toBe(updateData.title);
+            expect(res.body.data.amount).toBe(600);
+        });
+
+        it('should fail if trying to update an expense to SALARY without recipient', async () => {
+            const res = await request(app)
+                .put(`/api/expenses/${testExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send({ type: "SALARY" })
+                .expect(500);
+
+            expect(res.body.message).toMatch(/Recipient is required for salary expenses/);
+        });
+
+        it('should successfully update to SALARY with valid recipient', async () => {
+            const res = await request(app)
+                .put(`/api/expenses/${testExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send({ type: "SALARY", recipientId: teacherId })
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.data.type).toBe("SALARY");
+            expect(res.body.data.recipientId).toBe(teacherId);
+        });
+
+        it('should fail if updating from another school', async () => {
+            const otherAcc = await prisma.user.findFirst({ where: { schoolId: otherSchoolId } });
+            const otherExpense = await prisma.expense.create({
+                data: {
+                    title: "Other School Expense",
+                    amount: 100,
+                    type: "OTHER",
+                    schoolId: otherSchoolId,
+                    recordedById: otherAcc.id
+                }
+            });
+
+            const res = await request(app)
+                .put(`/api/expenses/${otherExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send({ title: "Hack Attempt" })
+                .expect(500);
+
+            expect(res.body.message).toMatch(/You do not have permission to update this expense/);
+        });
+    });
 });

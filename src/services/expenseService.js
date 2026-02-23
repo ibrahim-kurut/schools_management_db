@@ -1,19 +1,14 @@
 const prisma = require("../utils/prisma");
 
 /**
- * @description create a expense
- * @access private (Accountant or School Admin)
+ * @description Helper to validate expense recipient and role for Salaries
  */
-
-exports.createExpenseService = async (requester, expenseData) => {
-    const { title, amount, date, type, recipientId } = expenseData;
-
-    // 1. Recipient check (if provided or if type is SALARY)
+const validateExpenseRecipient = async (schoolId, type, recipientId) => {
     if (recipientId) {
         const user = await prisma.user.findUnique({
             where: {
                 id: recipientId,
-                schoolId: requester.schoolId,
+                schoolId: schoolId,
             },
         });
 
@@ -22,7 +17,6 @@ exports.createExpenseService = async (requester, expenseData) => {
         }
 
         if (type === "SALARY") {
-            // Optional: check if the user is a staff member (not a student)
             const staffRoles = ["TEACHER", "ACCOUNTANT", "ASSISTANT", "SCHOOL_ADMIN"];
             if (!staffRoles.includes(user.role)) {
                 throw new Error("Salaries can only be paid to staff members");
@@ -31,6 +25,17 @@ exports.createExpenseService = async (requester, expenseData) => {
     } else if (type === "SALARY") {
         throw new Error("Recipient is required for salary expenses");
     }
+};
+
+/**
+ * @description create a expense
+ * @access private (Accountant or School Admin)
+ */
+exports.createExpenseService = async (requester, expenseData) => {
+    const { title, amount, date, type, recipientId } = expenseData;
+
+    // 1. Recipient check
+    await validateExpenseRecipient(requester.schoolId, type, recipientId);
 
     // 2. Create the expense
     const expense = await prisma.expense.create({
@@ -140,4 +145,44 @@ exports.getExpenseByIdService = async (requester, id) => {
         },
     });
     return expense;
+};
+
+/**
+ * @description update a expense
+ * @access private (Accountant or School Admin)
+ */
+exports.updateExpenseService = async (requester, expenseId, updateData) => {
+    // 1. Verify existence and ownership
+    const existingExpense = await prisma.expense.findUnique({
+        where: { id: expenseId },
+        select: { schoolId: true, type: true, recipientId: true }
+    });
+
+    if (!existingExpense) {
+        throw new Error("Expense record not found");
+    }
+
+    if (existingExpense.schoolId !== requester.schoolId) {
+        throw new Error("You do not have permission to update this expense");
+    }
+
+    // 2. Validate recipient if provided or required by type
+    const finalType = updateData.type || existingExpense.type;
+    const finalRecipientId = updateData.recipientId !== undefined ? updateData.recipientId : existingExpense.recipientId;
+
+    await validateExpenseRecipient(requester.schoolId, finalType, finalRecipientId);
+
+    // 3. Update the expense
+    const { title, amount, date, type, recipientId } = updateData;
+
+    return await prisma.expense.update({
+        where: { id: expenseId },
+        data: {
+            title,
+            amount: amount !== undefined ? parseFloat(amount) : undefined,
+            date: date ? new Date(date) : undefined,
+            type,
+            recipientId: recipientId !== undefined ? recipientId : undefined,
+        },
+    });
 };
