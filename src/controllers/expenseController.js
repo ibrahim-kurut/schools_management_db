@@ -1,4 +1,4 @@
-const { createExpenseService, getAllExpensesService, getExpenseByIdService, updateExpenseService } = require("../services/expenseService");
+const { createExpenseService, getAllExpensesService, getExpenseByIdService, updateExpenseService, deleteExpenseService } = require("../services/expenseService");
 const asyncHandler = require("../utils/asyncHandler");
 const { createExpenseSchema, updateExpenseSchema } = require("../utils/expenseValidate");
 
@@ -101,5 +101,23 @@ exports.updateExpenseController = asyncHandler(async (req, res) => {
         status: "SUCCESS",
         message: "Expense updated successfully",
         data: updatedExpense,
+    });
+});
+
+/**
+ * @description Delete (soft) expense
+ * @route  /api/expenses/:id
+ * @method DELETE
+ * @access private (Accountant, School Admin)
+ */
+exports.deleteExpenseController = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const requester = req.user;
+
+    await deleteExpenseService(requester, id);
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Expense deleted successfully",
     });
 });

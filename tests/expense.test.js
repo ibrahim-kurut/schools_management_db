@@ -390,4 +390,105 @@ describe('Expense Management System Tests', () => {
             expect(res.body.message).toMatch(/You do not have permission to update this expense/);
         });
     });
+
+    describe('DELETE /api/expenses/:id', () => {
+        let expenseToDelete;
+
+        beforeEach(async () => {
+            expenseToDelete = await prisma.expense.create({
+                data: {
+                    title: "Expense to Delete",
+                    amount: 100,
+                    type: "OTHER",
+                    schoolId: schoolId,
+                    recordedById: (await prisma.user.findFirst({ where: { role: "ACCOUNTANT", schoolId } })).id
+                }
+            });
+        });
+
+        it('should successfully soft delete an expense', async () => {
+            const res = await request(app)
+                .delete(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            expect(res.body.status).toBe("SUCCESS");
+
+            // Verify it was soft deleted in DB
+            const deletedExpense = await prisma.expense.findUnique({
+                where: { id: expenseToDelete.id }
+            });
+            expect(deletedExpense.isDeleted).toBe(true);
+        });
+
+        it('should return 404 for an already deleted expense', async () => {
+            // First delete it
+            await request(app)
+                .delete(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            // Try to delete again
+            const res = await request(app)
+                .delete(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(500);
+
+            expect(res.body.message).toMatch(/Expense record not found/);
+        });
+
+        it('should not return deleted expenses in GET /api/expenses', async () => {
+            // First delete it
+            await request(app)
+                .delete(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            // Fetch all
+            const res = await request(app)
+                .get('/api/expenses')
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            // Verify the deleted expense is not in the list
+            const found = res.body.data.find(e => e.id === expenseToDelete.id);
+            expect(found).toBeUndefined();
+        });
+
+        it('should return 404 when fetching a deleted expense by ID', async () => {
+            // First delete it
+            await request(app)
+                .delete(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+
+            // Fetch by ID
+            const res = await request(app)
+                .get(`/api/expenses/${expenseToDelete.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(404);
+
+            expect(res.body.status).toBe("FAIL");
+        });
+
+        it('should fail if deleting from another school', async () => {
+            const otherAcc = await prisma.user.findFirst({ where: { schoolId: otherSchoolId } });
+            const otherExpense = await prisma.expense.create({
+                data: {
+                    title: "Other School Expense",
+                    amount: 100,
+                    type: "OTHER",
+                    schoolId: otherSchoolId,
+                    recordedById: otherAcc.id
+                }
+            });
+
+            const res = await request(app)
+                .delete(`/api/expenses/${otherExpense.id}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(500);
+
+            expect(res.body.message).toMatch(/You do not have permission to delete this expense/);
+        });
+    });
 });

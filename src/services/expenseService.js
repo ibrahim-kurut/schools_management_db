@@ -64,6 +64,7 @@ exports.getAllExpensesService = async (requester, page = 1, limit = 10) => {
         prisma.expense.findMany({
             where: {
                 schoolId: requester.schoolId,
+                isDeleted: false,
             },
             skip: skip,
             take: parseInt(limit),
@@ -94,7 +95,10 @@ exports.getAllExpensesService = async (requester, page = 1, limit = 10) => {
             },
         }),
         prisma.expense.count({
-            where: { schoolId: requester.schoolId }
+            where: {
+                schoolId: requester.schoolId,
+                isDeleted: false
+            }
         })
     ]);
 
@@ -118,6 +122,7 @@ exports.getExpenseByIdService = async (requester, id) => {
         where: {
             id,
             schoolId: requester.schoolId,
+            isDeleted: false,
         },
         select: {
             id: true,
@@ -152,13 +157,13 @@ exports.getExpenseByIdService = async (requester, id) => {
  * @access private (Accountant or School Admin)
  */
 exports.updateExpenseService = async (requester, expenseId, updateData) => {
-    // 1. Verify existence and ownership
+    // 1. Verify existence and ownership, and ensure it's not deleted
     const existingExpense = await prisma.expense.findUnique({
         where: { id: expenseId },
-        select: { schoolId: true, type: true, recipientId: true }
+        select: { schoolId: true, type: true, recipientId: true, isDeleted: true }
     });
 
-    if (!existingExpense) {
+    if (!existingExpense || existingExpense.isDeleted) {
         throw new Error("Expense record not found");
     }
 
@@ -184,5 +189,33 @@ exports.updateExpenseService = async (requester, expenseId, updateData) => {
             type,
             recipientId: recipientId !== undefined ? recipientId : undefined,
         },
+    });
+};
+
+/**
+ * @description delete (soft) a expense
+ * @access private (Accountant or School Admin)
+ */
+exports.deleteExpenseService = async (requester, expenseId) => {
+    // 1. Verify existence and ownership
+    const existingExpense = await prisma.expense.findUnique({
+        where: { id: expenseId },
+        select: { schoolId: true, isDeleted: true }
+    });
+
+    if (!existingExpense || existingExpense.isDeleted) {
+        throw new Error("Expense record not found");
+    }
+
+    if (existingExpense.schoolId !== requester.schoolId) {
+        throw new Error("You do not have permission to delete this expense");
+    }
+
+    // 2. Soft delete
+    return await prisma.expense.update({
+        where: { id: expenseId },
+        data: {
+            isDeleted: true
+        }
     });
 };
