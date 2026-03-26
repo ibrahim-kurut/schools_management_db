@@ -3,6 +3,14 @@ const { hashPassword, comparePassword, generateToken } = require("../utils/auth"
 
 exports.registerUser = async (userData) => {
     return await prisma.$transaction(async (tx) => {
+        // 0. Check if email already exists
+        const existingUser = await tx.user.findUnique({
+            where: { email: userData.email }
+        });
+        if (existingUser) {
+            throw new Error("هذا البريد الإلكتروني مسجل بالفعل");
+        }
+
         // 1. Preventing more than one super admin
         if (userData.role === 'SUPER_ADMIN') {
             const existingSuperAdmin = await tx.user.findFirst({

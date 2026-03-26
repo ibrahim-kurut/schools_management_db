@@ -1,8 +1,15 @@
 const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const app = express();
 
 // Middlewares
+app.use(cors({
+    origin: 'http://localhost:3000', // Update this to your production URL when ready
+    credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes 
 app.use('/api/auth', require('./routes/authRoutes'));

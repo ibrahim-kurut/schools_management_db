@@ -31,8 +31,15 @@ exports.login = asyncHandler(async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        token,
     }
+
+    // Set token in HttpOnly cookie
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
 
     res.status(200).json({ message: "Login successful", userData });
 });
@@ -67,8 +74,24 @@ exports.loginWithSchoolSlug = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
-        token,
     };
 
+    // Set token in HttpOnly cookie
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
     res.status(200).json({ message: "Login successful", userData });
+});
+
+exports.logout = asyncHandler(async (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+    });
+    res.status(200).json({ message: "Logged out successfully" });
 });
