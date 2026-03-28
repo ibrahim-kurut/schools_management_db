@@ -31,6 +31,8 @@ exports.login = asyncHandler(async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        schoolSlug: user.ownedSchool ? user.ownedSchool.slug : (user.school ? user.school.slug : null),
+        schoolId: user.ownedSchool ? user.ownedSchool.id : user.schoolId
     }
 
     // Set token in HttpOnly cookie
@@ -74,6 +76,7 @@ exports.loginWithSchoolSlug = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
+        schoolSlug: slug,
     };
 
     // Set token in HttpOnly cookie

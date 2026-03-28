@@ -46,7 +46,10 @@ exports.registerUser = async (userData) => {
 exports.loginUser = async (email, password) => {
     const user = await prisma.user.findUnique({
         where: { email },
-        include: { ownedSchool: true }
+        include: { 
+            ownedSchool: true,
+            school: true
+        }
     });
 
     if (!user) {

@@ -8,7 +8,8 @@ app.use(cors({
     origin: 'http://localhost:3000', // Update this to your production URL when ready
     credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
 
 // Routes 
