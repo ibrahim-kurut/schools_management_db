@@ -100,6 +100,7 @@ model User {
   email     String   @unique
   phone     String?
   password  String
+  image     String?  // Profile picture URL (stored in Supabase)
   gender    Gender
   birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)

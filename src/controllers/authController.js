@@ -1,16 +1,56 @@
 const { createUserSchema, loginUserSchema } = require("../utils/authValidate");
 const authService = require("../services/authService");
 const asyncHandler = require("../utils/asyncHandler");
+const supabase = require("../config/supabaseClient");
+
+const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
 
 exports.createUser = asyncHandler(async (req, res) => {
+    // 1. Validate text fields (works with both JSON and multipart/form-data)
     const { error, value } = createUserSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
+    // 2. Create user in database
     const user = await authService.registerUser(value);
+
+    // 3. Upload profile image if provided (optional)
+    let imageUrl = null;
+    if (req.file) {
+        const { buffer, mimetype, originalname } = req.file;
+        const extension = originalname.split('.').pop();
+        const uniqueFileName = `users/${user.id}/${Date.now()}.${extension}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from(BUCKET)
+            .upload(uniqueFileName, buffer, {
+                contentType: mimetype,
+                upsert: true,
+            });
+
+        if (uploadError) {
+            // Image upload failed but user is created — return user with a warning
+            console.error('Image upload failed during registration:', uploadError.message);
+            return res.status(201).json({
+                message: "User created successfully, but image upload failed.",
+                warning: uploadError.message,
+                user,
+            });
+        }
+
+        // Get public URL and update user record
+        const { data: publicUrlData } = supabase.storage
+            .from(BUCKET)
+            .getPublicUrl(uniqueFileName);
+
+        imageUrl = publicUrlData.publicUrl;
+
+        // Update the user's image field in DB
+        await authService.updateUserImage(user.id, imageUrl);
+    }
 
     res.status(201).json({
         message: "User created successfully",
-        user
+        user: { ...user, image: imageUrl },
     });
 });
 

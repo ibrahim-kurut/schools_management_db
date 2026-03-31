@@ -2,6 +2,9 @@ const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateS
 const { createSchoolSchema, updateSchoolSchema } = require("../utils/schoolValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
+const supabase = require("../config/supabaseClient");
+
+const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
 
 /**
  * @description Create a new school
@@ -11,19 +14,59 @@ const asyncHandler = require("../utils/asyncHandler");
  */
 
 exports.createSchool = asyncHandler(async (req, res) => {
-    // 1. validate request
+    // 1. validate request text fields (Joi handles req.body)
     const { error, value } = createSchoolSchema.validate(req.body);
     if (error) {
         return res.status(400).json({ message: error.details[0].message });
     }
 
-    // إضافة معرف المستخدم من التوكن
+    // Add user id from the token as the school owner
     value.userId = req.user.id;
 
-    // 2. create school
-    const school = await createSchoolService(value);
-    // 3. return school
-    res.status(201).json({ message: "School created successfully", school });
+    // 2. Initial creation of the school
+    let school = await createSchoolService(value);
+
+    // 3. Optional: Upload logo if a file is provided in the same request
+    if (req.file) {
+        const { buffer, mimetype, originalname } = req.file;
+        const extension = originalname.split('.').pop();
+        const uniqueFileName = `schools/${school.id}/${Date.now()}.${extension}`;
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+            .from(BUCKET)
+            .upload(uniqueFileName, buffer, {
+                contentType: mimetype,
+                upsert: true,
+            });
+
+        if (uploadError) {
+            console.error('Logo upload failed during school creation:', uploadError.message);
+            // We return 201 because the school is created, but with a warning about the logo
+            return res.status(201).json({
+                message: "School created successfully, but logo upload failed.",
+                warning: uploadError.message,
+                school
+            });
+        }
+
+        // Get public URL
+        const { data: publicUrlData } = supabase.storage
+            .from(BUCKET)
+            .getPublicUrl(uniqueFileName);
+
+        const logoUrl = publicUrlData.publicUrl;
+
+        // Update the school record with the new logo URL
+        // We use the same service for consistency
+        school = await updateSchoolByIdService(school.id, { logo: logoUrl }, req.user.id, req.user.role);
+    }
+
+    // 4. Return success response
+    res.status(201).json({ 
+        message: "School created successfully", 
+        school 
+    });
 });
 
 /**

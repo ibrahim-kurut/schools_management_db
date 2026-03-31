@@ -43,6 +43,16 @@ exports.registerUser = async (userData) => {
     });
 };
 
+/**
+ * @description Update user image URL after Supabase upload
+ */
+exports.updateUserImage = async (userId, imageUrl) => {
+    return await prisma.user.update({
+        where: { id: userId },
+        data: { image: imageUrl },
+    });
+};
+
 exports.loginUser = async (email, password) => {
     const user = await prisma.user.findUnique({
         where: { email },
