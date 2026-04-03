@@ -1,5 +1,7 @@
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/auth");
+const supabase = require("../config/supabaseClient");
+const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
 
 /**
  * @description Add a new member to a school
@@ -7,7 +9,7 @@ const { hashPassword } = require("../utils/auth");
  * @method POST
  * @access private (school owner)
  */
-exports.addMemberService = async (requesterId, memberData) => {
+exports.addMemberService = async (requesterId, memberData, file, requesterRole) => {
     // 1. Get School for the Requester (Owner) & Include Plan
     const school = await prisma.school.findUnique({
         where: { ownerId: requesterId },
@@ -29,6 +31,12 @@ exports.addMemberService = async (requesterId, memberData) => {
     }
 
     const memberRole = memberData.role;
+
+    // 2.5 Role Restriction: Assistant can only create TEACHER or STUDENT
+    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'STUDENT'].includes(memberRole)) {
+        throw new Error("Assistants can only add Teachers or Students");
+    }
+
     let targetClassId = null;
 
     // 3. Validate Class - Only required for STUDENT role
@@ -88,7 +96,15 @@ exports.addMemberService = async (requesterId, memberData) => {
             ...(memberRole === "STUDENT" && {
                 classId: targetClassId,
                 studentProfile: {
-                    create: {} // Create an empty student profile
+                    create: {
+                        // Only SCHOOL_ADMIN or ACCOUNTANT can set discount
+                        discountAmount: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT') 
+                            ? (memberData.discountAmount ? Number(memberData.discountAmount) : 0) 
+                            : 0,
+                        discountNotes: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
+                            ? (memberData.discountNotes || null)
+                            : null
+                    }
                 }
             })
         },
@@ -99,6 +115,43 @@ exports.addMemberService = async (requesterId, memberData) => {
             })
         }
     });
+
+    // 7. Handle Image Upload if provided
+    if (file) {
+        try {
+            const extension = file.originalname.split('.').pop();
+            const fileName = `users/${newUser.id}/${Date.now()}.${extension}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from(BUCKET)
+                .upload(fileName, file.buffer, {
+                    contentType: file.mimetype,
+                    upsert: true
+                });
+
+            if (!uploadError) {
+                const { data: publicUrlData } = supabase.storage
+                    .from(BUCKET)
+                    .getPublicUrl(fileName);
+
+                const imageUrl = publicUrlData.publicUrl;
+
+                // Update user with image URL in Database
+                await prisma.user.update({
+                    where: { id: newUser.id },
+                    data: { image: imageUrl }
+                });
+
+                // Update local object for response
+                newUser.image = imageUrl;
+            } else {
+                console.error("Supabase upload error:", uploadError);
+            }
+        } catch (uploadErr) {
+            console.error("Image upload failed during member creation:", uploadErr);
+        }
+    }
+
 
     // Return user without sensitive data
     const { password, ...userWithoutPassword } = newUser;
@@ -166,6 +219,12 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
             role: true,
             schoolId: true,
             createdAt: true,
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    discountNotes: true
+                }
+            }
         }
     });
 

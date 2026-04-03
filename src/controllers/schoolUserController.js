@@ -16,8 +16,8 @@ exports.addMemberController = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: error.details[0].message });
     }
 
-    // 2. Call Service (Pass Requester ID + Validated Body)
-    const newUser = await addMemberService(req.user.id, value);
+    // 2. Call Service (Pass Requester ID + Validated Body + File + Role)
+    const newUser = await addMemberService(req.user.id, value, req.file, req.user.role);
 
     // 3. Format Response
     let responseUser = newUser;
