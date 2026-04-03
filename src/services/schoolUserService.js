@@ -224,6 +224,12 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
                     discountAmount: true,
                     discountNotes: true
                 }
+            },
+            class: {
+                select: {
+                    id: true,
+                    name: true
+                }
             }
         }
     });
@@ -303,7 +309,7 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
  * @access private (school owner)
  */
 
-exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
+exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, requesterRole) => {
     // 1. Get School for the Requester (Owner)
     const school = await prisma.school.findUnique({
         where: { ownerId: ownerId },
@@ -319,19 +325,19 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
     // 2. check if member exists in school
     const targetMember = school.members[0];
     if (!targetMember) {
-        throw new Error("Member not found in this school");
+        throw new Error("عضو غير موجود في هذه المدرسة");
     }
 
-    // 3. Get the role of the user performing the update
-    const requester = await prisma.user.findUnique({
-        where: { id: ownerId },
-        select: { role: true }
-    });
+    // 3. RBAC Check: Assistant can only update TEACHER or STUDENT
+    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'STUDENT'].includes(targetMember.role)) {
+        throw new Error("المعاون يمكنه تعديل بيانات المعلمين والطلاب فقط");
+    }
+
 
     // 4. Specify allowed fields according to user role
     let dataToUpdate;
 
-    if (requester.role === "ASSISTANT") {
+    if (requesterRole === "ASSISTANT") {
         // 5. Assistant: Can edit only limited fields
         const allowedFieldsForAssistant = ['firstName', 'lastName', 'phone', 'gender', 'birthDate'];
 
@@ -380,7 +386,31 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
         if (dataToUpdate.password) {
             dataToUpdate.password = await hashPassword(dataToUpdate.password);
         }
+        // Handle image if sent
+        if (file) {
+            try {
+                const fileName = `users/${memberId}/${Date.now()}`;
+                const { data: uploadData, error: uploadErr } = await supabase.storage
+                    .from(BUCKET)
+                    .upload(fileName, file.buffer, {
+                        contentType: file.mimetype,
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (uploadErr) throw uploadErr;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from(BUCKET)
+                    .getPublicUrl(fileName);
+
+                dataToUpdate.image = publicUrl;
+            } catch (uploadErr) {
+                console.error("Image upload failed during member update:", uploadErr);
+            }
+        }
     }
+
 
     // 7. Execute the update
     const updatedMember = await prisma.user.update({
@@ -395,9 +425,22 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData) => {
             gender: true,
             birthDate: true,
             role: true,
+            image: true,
             schoolId: true,
             createdAt: true,
-            updatedAt: true
+            updatedAt: true,
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    discountNotes: true
+                }
+            },
+            class: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            }
         }
     });
 

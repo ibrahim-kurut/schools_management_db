@@ -60,10 +60,22 @@ exports.getAllMembersController = asyncHandler(async (req, res) => {
     // 3. Passing values to Service
     const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord, roleFilter);
 
+    // 4. Format members to include className for students
+    const formattedMembers = members.map(member => {
+        if (member.role === 'STUDENT' && member.class) {
+            return {
+                ...member,
+                className: member.class.name,
+                class: undefined
+            };
+        }
+        return member;
+    });
+
     res.status(200).json({
         message: "Members fetched successfully",
         school,
-        members,
+        members: formattedMembers,
         pagination: {
             currentPage: page,
             totalPages: Math.ceil(totalMembers / limit),
@@ -127,13 +139,24 @@ exports.updateMemberByIdController = asyncHandler(async (req, res) => {
     const ownerId = req.user.id;
     const reqData = bodyValue;
 
-    // 4. Call Service (Pass Owner ID + Member ID + Request Data)
-    const member = await updateMemberByIdService(ownerId, memberId, reqData);
+    // 4. Call Service (Pass Owner ID + Member ID + Request Data + File + Role)
+    const member = await updateMemberByIdService(ownerId, memberId, reqData, req.file, req.user.role);
 
-    // 5. Response
+    // 5. Format Response for Students
+    let responseMember = member;
+
+    if (member.role === "STUDENT" && member.class) {
+        responseMember = {
+            ...member,
+            className: member.class.name,
+            class: undefined
+        };
+    }
+
+    // 6. Response
     res.status(200).json({
         message: "Member updated successfully",
-        member
+        member: responseMember
     });
 });
 
