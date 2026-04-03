@@ -169,6 +169,9 @@ exports.updateClassController = asyncHandler(async (req, res) => {
     if (result.status === "NOT_FOUND") {
         return res.status(404).json({ message: result.message });
     }
+    if (result.status === "CONFLICT") {
+        return res.status(400).json({ message: result.message });
+    }
     //5. return class
     return res.status(200).json({
         message: result.message,

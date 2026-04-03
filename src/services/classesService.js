@@ -29,7 +29,7 @@ exports.createClassService = async (schoolId, classData) => {
             },
         });
         if (classExists) {
-            return { status: "CONFLICT", message: "Class already exists" };
+            return { status: "CONFLICT", message: `الصف "${classData.name}" موجود مسبقاً في مدرستك.` };
         }
 
         // 4. create the class
@@ -243,6 +243,21 @@ exports.updateClassService = async (schoolId, classId, classData) => {
         if (!classExists) {
             return { status: "NOT_FOUND", message: "Class not found" };
         }
+
+        // 2.5 Check if another class with the same new name exists
+        if (classData.name && classData.name !== classExists.name) {
+            const nameConflict = await prisma.class.findFirst({
+                where: {
+                    name: classData.name,
+                    schoolId: schoolId,
+                    id: { not: classId } // Exclude the current class
+                }
+            });
+            if (nameConflict) {
+                return { status: "CONFLICT", message: `عذراً، الصف "${classData.name}" موجود مسبقاً في مدرستك.` };
+            }
+        }
+
         // 3. update the class
         const updatedClass = await prisma.class.update({
             where: {

@@ -56,7 +56,7 @@ exports.updateUserImage = async (userId, imageUrl) => {
 exports.loginUser = async (email, password) => {
     const user = await prisma.user.findUnique({
         where: { email },
-        include: { 
+        include: {
             ownedSchool: true,
             school: true
         }
@@ -116,6 +116,10 @@ exports.loginUserBySchoolSlug = async (slug, email, password) => {
                 { schoolId: school.id },           // Member (teacher, student, assistant)
                 { ownedSchool: { id: school.id } } // Owner (school admin)
             ]
+        },
+        include: {
+            ownedSchool: true,
+            school: true
         }
     });
 
