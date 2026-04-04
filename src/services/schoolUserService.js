@@ -39,17 +39,19 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
 
     let targetClassId = null;
 
-    // 3. Validate Class - Only required for STUDENT role
-    if (memberRole === "STUDENT") {
-        if (!memberData.className) {
+    // 3. Validate Class - Required for STUDENT, Optional for TEACHER
+    if (memberRole === "STUDENT" || memberRole === "TEACHER") {
+        if (memberRole === "STUDENT" && !memberData.className) {
             throw new Error("Class name is required for students");
         }
 
-        const targetClass = school.classes.find((c) => c.name === memberData.className);
-        if (!targetClass) {
-            throw new Error("Class not found in this school");
+        if (memberData.className) {
+            const targetClass = school.classes.find((c) => c.name === memberData.className);
+            if (!targetClass) {
+                throw new Error("Class not found in this school");
+            }
+            targetClassId = targetClass.id;
         }
-        targetClassId = targetClass.id;
     }
 
     // 4. Check Plan Limits
@@ -92,26 +94,30 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
             birthDate: new Date(memberData.birthDate),
             role: memberRole,
             schoolId: school.id,
-            // classId is set only for STUDENT, otherwise null
-            ...(memberRole === "STUDENT" && {
+            // classId is set for STUDENT or TEACHER if provided
+            ...((memberRole === "STUDENT" || memberRole === "TEACHER") && {
                 classId: targetClassId,
-                studentProfile: {
-                    create: {
-                        // Only SCHOOL_ADMIN or ACCOUNTANT can set discount
-                        discountAmount: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT') 
-                            ? (memberData.discountAmount ? Number(memberData.discountAmount) : 0) 
-                            : 0,
-                        discountNotes: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
-                            ? (memberData.discountNotes || null)
-                            : null
+                ...(memberRole === "STUDENT" && {
+                    studentProfile: {
+                        create: {
+                            // Only SCHOOL_ADMIN or ACCOUNTANT can set discount
+                            discountAmount: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT') 
+                                ? (memberData.discountAmount ? Number(memberData.discountAmount) : 0) 
+                                : 0,
+                            discountNotes: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
+                                ? (memberData.discountNotes || null)
+                                : null
+                        }
                     }
-                }
+                })
             })
         },
         include: {
-            ...(memberRole === "STUDENT" && {
+            ...((memberRole === "STUDENT" || memberRole === "TEACHER") && {
                 class: true,
-                studentProfile: true
+                ...(memberRole === "STUDENT" && {
+                    studentProfile: true
+                })
             })
         }
     });
