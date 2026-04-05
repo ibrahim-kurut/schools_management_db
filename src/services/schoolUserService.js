@@ -106,6 +106,9 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
                                 : 0,
                             discountNotes: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
                                 ? (memberData.discountNotes || null)
+                                : null,
+                            customTuitionFee: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
+                                ? (memberData.customTuitionFee ? Number(memberData.customTuitionFee) : null)
                                 : null
                         }
                     }
@@ -228,10 +231,17 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
             studentProfile: {
                 select: {
                     discountAmount: true,
-                    discountNotes: true
+                    discountNotes: true,
+                    customTuitionFee: true
                 }
             },
             class: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            },
+            subjects: {
                 select: {
                     id: true,
                     name: true
@@ -290,7 +300,14 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
             studentProfile: {
                 select: {
                     discountAmount: true,
-                    discountNotes: true
+                    discountNotes: true,
+                    customTuitionFee: true
+                }
+            },
+            subjects: {
+                select: {
+                    id: true,
+                    name: true
                 }
             },
         }
@@ -415,6 +432,27 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
                 console.error("Image upload failed during member update:", uploadErr);
             }
         }
+
+        // Handle Student Financial Details
+        if (targetMember.role === "STUDENT" && (dataToUpdate.customTuitionFee !== undefined || dataToUpdate.discountAmount !== undefined || dataToUpdate.discountNotes !== undefined)) {
+            dataToUpdate.studentProfile = {
+                upsert: {
+                    update: {
+                        customTuitionFee: dataToUpdate.customTuitionFee !== undefined ? (dataToUpdate.customTuitionFee ? Number(dataToUpdate.customTuitionFee) : null) : undefined,
+                        discountAmount: dataToUpdate.discountAmount !== undefined ? Number(dataToUpdate.discountAmount) : undefined,
+                        discountNotes: dataToUpdate.discountNotes !== undefined ? dataToUpdate.discountNotes : undefined,
+                    },
+                    create: {
+                        customTuitionFee: dataToUpdate.customTuitionFee ? Number(dataToUpdate.customTuitionFee) : null,
+                        discountAmount: dataToUpdate.discountAmount ? Number(dataToUpdate.discountAmount) : 0,
+                        discountNotes: dataToUpdate.discountNotes || null,
+                    }
+                }
+            };
+            delete dataToUpdate.customTuitionFee;
+            delete dataToUpdate.discountAmount;
+            delete dataToUpdate.discountNotes;
+        }
     }
 
 
@@ -438,10 +476,17 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
             studentProfile: {
                 select: {
                     discountAmount: true,
-                    discountNotes: true
+                    discountNotes: true,
+                    customTuitionFee: true
                 }
             },
             class: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            },
+            subjects: {
                 select: {
                     id: true,
                     name: true

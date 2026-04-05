@@ -455,6 +455,8 @@ model StudentProfile {
   discountAmount Float   @default(0)
   discountNotes  String?
 
+  customTuitionFee Float? // Override for class tuitionFee
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

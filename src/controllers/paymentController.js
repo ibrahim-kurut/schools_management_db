@@ -1,4 +1,4 @@
-const { updateStudentDiscountService, createPaymentService, getStudentFinancialRecordService, updatePaymentService } = require("../services/paymentService");
+const { updateStudentDiscountService, createPaymentService, getStudentFinancialRecordService, updatePaymentService, getStudentsFeesSummaryService } = require("../services/paymentService");
 const asyncHandler = require("../utils/asyncHandler");
 const { createPaymentSchema, updatePaymentSchema } = require("../utils/paymentValidate");
 
@@ -108,6 +108,28 @@ exports.updatePaymentController = asyncHandler(async (req, res) => {
         data: updatedPayment
     });
 });
+
+/**
+ * @description Get all students with their financial summary
+ * @route GET /api/payments/students-summary
+ * @method GET
+ * @access private (Accountant, School Admin)
+ */
+exports.getStudentsFeesSummaryController = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const classFilter = req.query.classFilter || "ALL";
+
+    const result = await getStudentsFeesSummaryService(req.user, { page, limit, search, classFilter });
+
+    res.status(200).json({
+        status: "SUCCESS",
+        message: "Students fees summary retrieved successfully",
+        data: result
+    });
+});
+
 
 
 

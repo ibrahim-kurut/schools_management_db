@@ -41,6 +41,104 @@ exports.updateStudentDiscountService = async (requesterId, studentId, { discount
 };
 
 /**
+ * @description Get all students with their financial summary (fees, paid, balance)
+ * @access private (Accountant, School Admin)
+ */
+exports.getStudentsFeesSummaryService = async (requester, { page, limit, search, classFilter }) => {
+    const skip = (page - 1) * limit;
+
+    // 1. Build where clause
+    const whereClause = {
+        schoolId: requester.schoolId,
+        role: "STUDENT",
+        isDeleted: false,
+    };
+
+    if (search && search.trim() !== "") {
+        whereClause.OR = [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } }
+        ];
+    }
+
+    if (classFilter && classFilter !== "ALL") {
+        whereClause.class = { name: classFilter };
+    }
+
+    // 2. Fetch Total Count for Pagination
+    const totalStudents = await prisma.user.count({ where: whereClause });
+
+    // 3. Fetch Students with relations
+    const students = await prisma.user.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { firstName: 'asc' },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            class: {
+                select: {
+                    name: true,
+                    tuitionFee: true
+                }
+            },
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    customTuitionFee: true
+                }
+            },
+            paymentsMade: {
+                where: {
+                    paymentType: "TUITION",
+                    status: "COMPLETED"
+                },
+                select: {
+                    amount: true
+                }
+            }
+        }
+    });
+
+    // 4. Calculate Summaries
+    const formattedStudents = students.map(student => {
+        const customFee = student.studentProfile?.customTuitionFee;
+        const baseFee = customFee !== null ? customFee : (student.class?.tuitionFee || 0);
+        const discount = student.studentProfile?.discountAmount || 0;
+        const totalFees = baseFee - discount;
+        const paid = student.paymentsMade.reduce((sum, p) => sum + p.amount, 0);
+        const balance = totalFees - paid;
+
+        let status = "PENDING";
+        if (paid > 0) {
+            status = balance <= 0 ? "COMPLETED" : "PARTIAL";
+        }
+
+        return {
+            id: student.id,
+            name: `${student.firstName} ${student.lastName}`,
+            className: student.class?.name || "Not Assigned",
+            totalFees,
+            paid,
+            balance,
+            status
+        };
+    });
+
+    return {
+        students: formattedStudents,
+        pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalStudents / limit),
+            totalStudents,
+            itemsPerPage: limit
+        }
+    };
+};
+
+/**
  * @description create a new payment
  * @access private (Accountant)
  */
@@ -129,7 +227,8 @@ exports.getStudentFinancialRecordService = async (requesterId, studentId) => {
             studentProfile: {
                 select: {
                     discountAmount: true,
-                    discountNotes: true
+                    discountNotes: true,
+                    customTuitionFee: true
                 }
             },
             paymentsMade: {
@@ -165,9 +264,10 @@ exports.getStudentFinancialRecordService = async (requesterId, studentId) => {
     }
 
     // 4. Calculations
-    const classFee = student.class?.tuitionFee || 0;
+    const customFee = student.studentProfile?.customTuitionFee;
+    const baseFee = customFee !== null ? customFee : (student.class?.tuitionFee || 0);
     const discount = student.studentProfile?.discountAmount || 0;
-    const netRequired = classFee - discount;
+    const netRequired = baseFee - discount;
 
     const totalPaid = student.paymentsMade.reduce((sum, p) => sum + p.amount, 0);
     const balance = netRequired - totalPaid;
@@ -176,7 +276,7 @@ exports.getStudentFinancialRecordService = async (requesterId, studentId) => {
         studentName: `${student.firstName} ${student.lastName}`,
         className: student.class?.name || "Not Assigned",
         summary: {
-            totalTuitionFee: classFee,
+            totalTuitionFee: baseFee,
             discountAmount: discount,
             netRequired: netRequired,
             totalPaid: totalPaid,

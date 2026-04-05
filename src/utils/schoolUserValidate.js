@@ -27,7 +27,9 @@ const addSchoolMemberSchema = Joi.object({
         'any.required': 'Birth date is required'
     }),
     className: Joi.string().trim().allow(null, '').optional(),
+    subject: Joi.string().trim().allow(null, '').optional(),
     discountAmount: Joi.number().min(0).optional(),
+    customTuitionFee: Joi.number().min(0).allow(null, '').optional(),
     discountNotes: Joi.string().trim().allow(null, '').optional(),
     role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').required().messages({
         'any.only': 'Role must be one of [TEACHER, ASSISTANT, STUDENT, ACCOUNTANT]',
@@ -44,7 +46,9 @@ const updateSchoolMemberSchema = Joi.object({
     gender: Joi.string().trim().valid('MALE', 'FEMALE').empty('').optional(),
     birthDate: Joi.date().empty('').optional(),
     className: Joi.string().trim().empty('').optional(),
+    subject: Joi.string().trim().empty('').optional(),
     discountAmount: Joi.number().min(0).optional(),
+    customTuitionFee: Joi.number().min(0).allow(null, '').optional(),
     discountNotes: Joi.string().trim().empty('').optional(),
     role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').empty('').optional(),
 });
