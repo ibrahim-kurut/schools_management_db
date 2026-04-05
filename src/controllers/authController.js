@@ -75,7 +75,8 @@ exports.login = asyncHandler(async (req, res) => {
         image: user.image || null,
         schoolSlug: user.ownedSchool ? user.ownedSchool.slug : (user.school ? user.school.slug : null),
         schoolId: user.ownedSchool ? user.ownedSchool.id : user.schoolId,
-        schoolLogo: user.ownedSchool?.logo || user.school?.logo || null
+        schoolLogo: user.ownedSchool?.logo || user.school?.logo || null,
+        schoolName: user.ownedSchool?.name || user.school?.name || null
     }
 
     // Set token in HttpOnly cookie
@@ -121,7 +122,8 @@ exports.loginWithSchoolSlug = asyncHandler(async (req, res) => {
         image: user.image || null,
         schoolId: user.schoolId,
         schoolSlug: slug,
-        schoolLogo: user.ownedSchool?.logo || user.school?.logo || null
+        schoolLogo: user.ownedSchool?.logo || user.school?.logo || null,
+        schoolName: user.ownedSchool?.name || user.school?.name || null
     };
 
     // Set token in HttpOnly cookie
