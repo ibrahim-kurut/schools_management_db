@@ -32,7 +32,7 @@ const validateExpenseRecipient = async (schoolId, type, recipientId) => {
  * @access private (Accountant or School Admin)
  */
 exports.createExpenseService = async (requester, expenseData) => {
-    const { title, amount, date, type, recipientId } = expenseData;
+    const { title, amount, date, type, recipientId, recipientName } = expenseData;
 
     // 1. Recipient check
     await validateExpenseRecipient(requester.schoolId, type, recipientId);
@@ -46,8 +46,35 @@ exports.createExpenseService = async (requester, expenseData) => {
             type,
             schoolId: requester.schoolId,
             recipientId: recipientId || null,
+            recipientName: recipientName || null,
             recordedById: requester.id,
         },
+        select: {
+            id: true,
+            title: true,
+            amount: true,
+            date: true,
+            type: true,
+            recipientId: true,
+            recipientName: true,
+            recordedById: true,
+            recipient: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    role: true,
+                }
+            },
+            recordedBy: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    role: true,
+                }
+            },
+        }
     });
 
     return expense;
@@ -76,6 +103,7 @@ exports.getAllExpensesService = async (requester, page = 1, limit = 10) => {
                 date: true,
                 type: true,
                 recipientId: true,
+                recipientName: true,
                 recordedById: true,
 
                 recipient: {
@@ -131,6 +159,7 @@ exports.getExpenseByIdService = async (requester, id) => {
             date: true,
             type: true,
             recipientId: true,
+            recipientName: true,
             recordedById: true,
 
             recipient: {
@@ -178,7 +207,7 @@ exports.updateExpenseService = async (requester, expenseId, updateData) => {
     await validateExpenseRecipient(requester.schoolId, finalType, finalRecipientId);
 
     // 3. Update the expense
-    const { title, amount, date, type, recipientId } = updateData;
+    const { title, amount, date, type, recipientId, recipientName } = updateData;
 
     return await prisma.expense.update({
         where: { id: expenseId },
@@ -188,7 +217,34 @@ exports.updateExpenseService = async (requester, expenseId, updateData) => {
             date: date ? new Date(date) : undefined,
             type,
             recipientId: recipientId !== undefined ? recipientId : undefined,
+            recipientName: recipientName !== undefined ? recipientName : undefined,
         },
+        select: {
+            id: true,
+            title: true,
+            amount: true,
+            date: true,
+            type: true,
+            recipientId: true,
+            recipientName: true,
+            recordedById: true,
+            recipient: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    role: true,
+                }
+            },
+            recordedBy: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    role: true,
+                }
+            },
+        }
     });
 };
 

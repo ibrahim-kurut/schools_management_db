@@ -3,59 +3,71 @@ const Joi = require("joi");
 const createExpenseSchema = Joi.object({
     title: Joi.string().trim().min(3).required()
         .messages({
-            'string.min': 'Title must be at least 3 characters long',
-            'any.required': 'Title is required'
+            'string.base': 'عنوان المصروف يجب أن يكون نصاً',
+            'string.empty': 'عنوان المصروف مطلوب',
+            'string.min': 'يجب أن يكون عنوان المصروف 3 أحرف على الأقل',
+            'any.required': 'عنوان المصروف حقل مطلوب'
         }),
 
     amount: Joi.number().positive().required()
         .messages({
-            'number.base': 'Amount must be a number',
-            'number.positive': 'Amount must be a positive value',
-            'any.required': 'Amount is required'
+            'number.base': 'المبلغ يجب أن يكون رقماً',
+            'number.positive': 'يجب أن يكون المبلغ قيمة موجبة',
+            'any.required': 'المبلغ حقل مطلوب'
         }),
 
     date: Joi.date().optional()
         .messages({
-            'date.base': 'Date must be a valid date format'
+            'date.base': 'التاريخ المدخل غير صحيح'
         }),
 
     type: Joi.string().valid("SALARY", "MAINTENANCE", "SUPPLIES", "RENT", "UTILITIES", "MARKETING", "OTHER").required()
         .messages({
-            'any.only': 'Expense type must be one of: SALARY, MAINTENANCE, SUPPLIES, RENT, UTILITIES, MARKETING, OTHER',
-            'any.required': 'Expense type is required'
+            'any.only': 'نوع المصروف غير صالح',
+            'any.required': 'نوع المصروف حقل مطلوب'
         }),
 
-    recipientId: Joi.string().uuid().optional()
+    recipientId: Joi.string().uuid().allow(null, '').optional()
         .messages({
-            'string.guid': 'Recipient ID must be a valid UUID'
+            'string.guid': 'معرف المستلم غير صحيح'
+        }),
+
+    recipientName: Joi.string().trim().max(100).allow(null, '').optional()
+        .messages({
+            'string.max': 'اسم المستلم طويل جداً (الحد الأقصى 100 حرف)'
         })
 });
 
 const updateExpenseSchema = Joi.object({
     title: Joi.string().trim().min(3).optional()
         .messages({
-            'string.min': 'Title must be at least 3 characters long'
+            'string.min': 'يجب أن يكون عنوان المصروف 3 أحرف على الأقل'
         }),
 
     amount: Joi.number().positive().optional()
         .messages({
-            'number.base': 'Amount must be a number',
-            'number.positive': 'Amount must be a positive value'
+            'number.base': 'المبلغ يجب أن يكون رقماً',
+            'number.positive': 'يجب أن يكون المبلغ قيمة موجبة'
         }),
 
     date: Joi.date().optional()
         .messages({
-            'date.base': 'Date must be a valid date format'
+            'date.base': 'التاريخ المدخل غير صحيح'
         }),
 
     type: Joi.string().valid("SALARY", "MAINTENANCE", "SUPPLIES", "RENT", "UTILITIES", "MARKETING", "OTHER").optional()
         .messages({
-            'any.only': 'Expense type must be one of: SALARY, MAINTENANCE, SUPPLIES, RENT, UTILITIES, MARKETING, OTHER'
+            'any.only': 'نوع المصروف غير صالح'
         }),
 
-    recipientId: Joi.string().uuid().optional().allow(null)
+    recipientId: Joi.string().uuid().allow(null, '').optional()
         .messages({
-            'string.guid': 'Recipient ID must be a valid UUID'
+            'string.guid': 'معرف المستلم غير صحيح'
+        }),
+
+    recipientName: Joi.string().trim().max(100).allow(null, '').optional()
+        .messages({
+            'string.max': 'اسم المستلم طويل جداً (الحد الأقصى 100 حرف)'
         })
 });
 

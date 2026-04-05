@@ -369,6 +369,8 @@ model Expense {
   recipientId String? // If salary
   recipient   User?   @relation("ExpenseRecipient", fields: [recipientId], references: [id])
 
+  recipientName String? // Manual name if not a school member
+
   recordedById String?
   recordedBy   User?   @relation("ExpenseRecorder", fields: [recordedById], references: [id])
 
