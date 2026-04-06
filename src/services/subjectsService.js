@@ -244,12 +244,23 @@ exports.deleteSubjectService = async (schoolId, subjectIdValue) => {
     });
 
     if (!existingSubject) {
-        const error = new Error("Subject not found or does not belong to this school");
+        const error = new Error("المادة غير موجودة أو لا تنتمي لهذه المدرسة.");
         error.statusCode = 404;
         throw error;
     }
 
-    // 2. Delete subject (Soft Delete)
+    // 2. Check for related grades (Safe Deletion Validation)
+    const gradeCount = await prisma.grade.count({
+        where: { subjectId: id }
+    });
+
+    if (gradeCount > 0) {
+        const error = new Error("لا يمكن حذف المادة لوجود درجات مرصودة مرتبطة بها.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // 3. Delete subject (Soft Delete)
     const deletedSubject = await prisma.subject.update({
         where: { id },
         data: {

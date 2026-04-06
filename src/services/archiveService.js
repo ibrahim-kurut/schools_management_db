@@ -149,11 +149,36 @@ exports.permanentDeleteService = async (schoolId, type, id) => {
                 await prisma.class.delete({ where: { id } });
                 break;
             case 'subject':
+                // Check for grades before permanent delete
+                const subjectGradeCount = await prisma.grade.count({
+                    where: { subjectId: id }
+                });
+                if (subjectGradeCount > 0) {
+                    return { status: "ERROR", message: "لا يمكن الحذف النهائي للمادة لوجود درجات مرصودة مرتبطة بها." };
+                }
+
                 await prisma.subject.delete({ 
                     where: { id, class: { schoolId } } 
                 });
                 break;
             case 'academicYear':
+                // Check if current or has grades
+                const yearInfo = await prisma.academicYear.findFirst({
+                    where: { id, schoolId }
+                });
+                if (!yearInfo) return { status: "ERROR", message: "السنة الدراسية غير موجودة." };
+                
+                if (yearInfo.isCurrent) {
+                    return { status: "ERROR", message: "لا يمكن الحذف النهائي للسنة الدراسية النشطة." };
+                }
+
+                const yearGradeCount = await prisma.grade.count({
+                    where: { academicYearId: id }
+                });
+                if (yearGradeCount > 0) {
+                    return { status: "ERROR", message: "لا يمكن الحذف النهائي للسنة الدراسية لوجود درجات مرصودة مرتبطة بها." };
+                }
+
                 await prisma.academicYear.delete({ 
                     where: { id, schoolId } 
                 });

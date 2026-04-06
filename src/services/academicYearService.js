@@ -258,7 +258,21 @@ exports.deleteAcademicYearService = async (schoolId, academicYearId) => {
             where: { id: academicYearId, schoolId: schoolId }
         });
         if (!academicYear) {
-            return { status: "NOT_FOUND", message: "Academic year not found" };
+            return { status: "NOT_FOUND", message: "السنة الدراسية غير موجودة." };
+        }
+
+        // 2.5 Check if it's the current year (Safe Deletion Validation)
+        if (academicYear.isCurrent) {
+            return { status: "NOT_ALLOWED", message: "لا يمكن حذف السنة الدراسية الحالية النشطة." };
+        }
+
+        // 2.6 Check for related grades
+        const gradeCount = await prisma.grade.count({
+            where: { academicYearId }
+        });
+
+        if (gradeCount > 0) {
+            return { status: "NOT_ALLOWED", message: "لا يمكن حذف السنة الدراسية لوجود درجات مرصودة مرتبطة بها." };
         }
 
         // 3. delete the academic year (Soft Delete with Rename)
