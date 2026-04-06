@@ -16,7 +16,7 @@ exports.createClassService = async (schoolId, classData) => {
         });
 
         if (!school) {
-            return { status: "NOT_FOUND", message: "School not found" };
+            return { status: "NOT_FOUND", message: "المدرسة غير موجودة." };
 
         }
 
@@ -47,7 +47,7 @@ exports.createClassService = async (schoolId, classData) => {
         // 6. return the class
         return {
             status: "SUCCESS",
-            message: "Class created successfully",
+            message: "تم إنشاء الصف بنجاح.",
             class: newClass
         };
 
@@ -71,7 +71,7 @@ exports.getAllClassesService = async (schoolId) => {
         });
 
         if (!school) {
-            return { status: "NOT_FOUND", message: "School not found" };
+            return { status: "NOT_FOUND", message: "المدرسة غير موجودة." };
         }
 
         // 0. Check Redis Cache
@@ -101,7 +101,7 @@ exports.getAllClassesService = async (schoolId) => {
         // 4. return the classes
         const result = {
             status: "SUCCESS",
-            message: "Classes fetched successfully",
+            message: "تم جلب الصفوف بنجاح.",
             classes: classes
         };
 
@@ -148,11 +148,11 @@ exports.getClassStudentsService = async (schoolId, classId) => {
 
 
         if (!classWithStudents) {
-            return { status: "NOT_FOUND", message: "The requested class was not found in your school records." };
+            return { status: "NOT_FOUND", message: "الصف المطلوب غير موجود في سجلات مدرستك." };
         }
 
         if (classWithStudents.students.length === 0) {
-            return { status: "NOT_FOUND", message: "No students found for this class." };
+            return { status: "NOT_FOUND", message: "لا يوجد طلاب مسجلين في هذا الصف." };
         }
 
         // 4. return students
@@ -205,7 +205,7 @@ exports.getClassByIdService = async (schoolId, classId) => {
             }
         });
         if (!classExists) {
-            return { status: "NOT_FOUND", message: "Class not found" };
+            return { status: "NOT_FOUND", message: "الصف غير موجود." };
         }
         // 3. return the class
         const result = {
@@ -241,7 +241,7 @@ exports.updateClassService = async (schoolId, classId, classData) => {
             },
         });
         if (!classExists) {
-            return { status: "NOT_FOUND", message: "Class not found" };
+            return { status: "NOT_FOUND", message: "الصف غير موجود." };
         }
 
         // 2.5 Check if another class with the same new name exists
@@ -271,7 +271,7 @@ exports.updateClassService = async (schoolId, classId, classData) => {
         // 4. return the class
         const result = {
             status: "SUCCESS",
-            message: "Class updated successfully",
+            message: "تم تحديث الصف بنجاح.",
             class: updatedClass
         };
 
@@ -309,14 +309,14 @@ exports.deleteClassService = async (schoolId, classId) => {
             }
         });
         if (!targetClass) {
-            return { status: "NOT_FOUND", message: "Class not found" };
+            return { status: "NOT_FOUND", message: "الصف غير موجود." };
         }
 
         let isDeleteClass = true;
 
         if (targetClass._count.students > 0) {
             isDeleteClass = false;
-            return { status: "NOT_ALLOWED", message: "Class cannot be deleted as it has students" };
+            return { status: "NOT_ALLOWED", message: "لا يمكن حذف الصف الدراسي لاحتوائه على طلاب مسجلين." };
         }
 
 
@@ -336,7 +336,7 @@ exports.deleteClassService = async (schoolId, classId) => {
 
         return {
             status: "SUCCESS",
-            message: "Class deleted successfully",
+            message: "تم حذف الصف بنجاح.",
             class: deletedClass
         };
 

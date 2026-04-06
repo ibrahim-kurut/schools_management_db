@@ -12,16 +12,16 @@ exports.createAcademicYearService = async (schoolId, reqData) => {
     const school = await prisma.school.findUnique({
         where: { id: schoolId }
     });
-    if (!school) {
-        return { status: "NOT_FOUND", message: "School not found" };
-    }
+        if (!school) {
+            return { status: "NOT_FOUND", message: "المدرسة غير موجودة." };
+        }
 
     // 2. check if the academic year already exists
     const academicYear = await prisma.academicYear.findFirst({
         where: { name: reqData.name, schoolId: schoolId }
     });
     if (academicYear) {
-        return { status: "CONFLICT", message: "Academic year already exists" };
+        return { status: "CONFLICT", message: "السنة الدراسية موجودة مسبقاً." };
     }
 
     // 3. handle isCurrent logic
@@ -40,7 +40,7 @@ exports.createAcademicYearService = async (schoolId, reqData) => {
     // 5. Invalidate List Cache
     await redis.del(`school:${schoolId}:academic-years`);
 
-    return { status: "SUCCESS", message: "Academic year created successfully", academicYear: newAcademicYear };
+    return { status: "SUCCESS", message: "تم إضافة السنة الدراسية بنجاح.", academicYear: newAcademicYear };
 };
 
 /**
@@ -97,7 +97,7 @@ exports.getAcademicYearsService = async (schoolId) => {
         const totalActive = totalAll - totalDeleted;
         const result = {
             status: "SUCCESS",
-            message: "Data retrieved",
+            message: "تم جلب البيانات بنجاح.",
             academicYears: academicYears,
             stats: {
                 totalAcademicYears: totalAll,
@@ -152,11 +152,11 @@ exports.getAcademicYearByIdService = async (schoolId, academicYearId) => {
             }
         });
         if (!academicYear) {
-            return { status: "NOT_FOUND", message: "Academic year not found" };
+            return { status: "NOT_FOUND", message: "السنة الدراسية غير موجودة." };
         }
 
         // 3. return the academic year
-        const result = { status: "SUCCESS", message: "Academic year retrieved successfully", academicYear: academicYear };
+        const result = { status: "SUCCESS", message: "تم جلب بيانات السنة الدراسية بنجاح.", academicYear: academicYear };
 
         // 4. Save to Redis Cache (1 hour)
         await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
@@ -201,7 +201,7 @@ exports.updateAcademicYearService = async (schoolId, academicYearId, reqData) =>
                 }
             });
             if (existingName) {
-                return { status: "CONFLICT", message: "Academic year name already exists" };
+                return { status: "CONFLICT", message: "اسم السنة الدراسية موجود مسبقاً." };
             }
         }
 
@@ -210,7 +210,7 @@ exports.updateAcademicYearService = async (schoolId, academicYearId, reqData) =>
         let endDate = reqData.endDate ? new Date(reqData.endDate) : new Date(academicYear.endDate);
 
         if (endDate <= startDate) {
-            return { status: "CONFLICT", message: "End date must be after start date" };
+            return { status: "CONFLICT", message: "تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء." };
         }
 
         // 5. handle isCurrent logic
@@ -231,7 +231,7 @@ exports.updateAcademicYearService = async (schoolId, academicYearId, reqData) =>
         await redis.del(`school:${schoolId}:academic-years`);
         await redis.del(`school:${schoolId}:academic-year:${academicYearId}`);
 
-        return { status: "SUCCESS", message: "Academic year updated successfully", academicYear: updatedAcademicYear };
+        return { status: "SUCCESS", message: "تم تحديث السنة الدراسية بنجاح.", academicYear: updatedAcademicYear };
     } catch (error) {
         throw error;
     }
@@ -274,7 +274,7 @@ exports.deleteAcademicYearService = async (schoolId, academicYearId) => {
         await redis.del(`school:${schoolId}:academic-years`);
         await redis.del(`school:${schoolId}:academic-year:${academicYearId}`);
 
-        return { status: "SUCCESS", message: "Academic year deleted successfully", academicYear: deletedAcademicYear };
+        return { status: "SUCCESS", message: "تم حذف السنة الدراسية بنجاح.", academicYear: deletedAcademicYear };
     } catch (error) {
         throw error;
     }
