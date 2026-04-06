@@ -84,7 +84,8 @@ exports.getAllClassesService = async (schoolId) => {
         // 3. get all classes
         const classes = await prisma.class.findMany({
             where: {
-                schoolId
+                schoolId,
+                isDeleted: false
             },
             select: {
                 id: true,
@@ -127,7 +128,8 @@ exports.getClassStudentsService = async (schoolId, classId) => {
         const classWithStudents = await prisma.class.findFirst({
             where: {
                 id: classId,
-                schoolId: schoolId
+                schoolId: schoolId,
+                isDeleted: false
             },
             include: {
                 students: {
@@ -187,6 +189,7 @@ exports.getClassByIdService = async (schoolId, classId) => {
             where: {
                 id: classId,
                 schoolId: schoolId,
+                isDeleted: false
             },
             include: {
                 students: {
@@ -238,6 +241,7 @@ exports.updateClassService = async (schoolId, classId, classData) => {
             where: {
                 id: classId,
                 schoolId: schoolId,
+                isDeleted: false
             },
         });
         if (!classExists) {
@@ -299,6 +303,7 @@ exports.deleteClassService = async (schoolId, classId) => {
             where: {
                 id: classId,
                 schoolId: schoolId,
+                isDeleted: false
             },
             include: {
                 _count: {
@@ -320,13 +325,18 @@ exports.deleteClassService = async (schoolId, classId) => {
         }
 
 
-        // 3. delete the class
+        // 3. delete the class (Soft Delete)
         let deletedClass = null;
         if (isDeleteClass) {
-            deletedClass = await prisma.class.delete({
+            deletedClass = await prisma.class.update({
                 where: {
                     id: classId,
                 },
+                data: {
+                    isDeleted: true,
+                    deletedAt: new Date(),
+                    name: `${targetClass.name}_deleted_${Date.now()}` // Rename to free up name
+                }
             });
         }
 

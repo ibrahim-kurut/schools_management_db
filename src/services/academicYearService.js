@@ -140,8 +140,8 @@ exports.getAcademicYearByIdService = async (schoolId, academicYearId) => {
         }
 
         // 2. get the academic year
-        const academicYear = await prisma.academicYear.findUnique({
-            where: { id: academicYearId },
+        const academicYear = await prisma.academicYear.findFirst({
+            where: { id: academicYearId, isDeleted: false, schoolId },
 
             include: {
                 school: {
@@ -266,6 +266,7 @@ exports.deleteAcademicYearService = async (schoolId, academicYearId) => {
             where: { id: academicYearId },
             data: {
                 isDeleted: true,
+                deletedAt: new Date(),
                 name: `${academicYear.name}_deleted_${Date.now()}` // Rename to free up the name
             }
         });

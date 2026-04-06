@@ -105,6 +105,7 @@ model User {
   birthDate DateTime
   role      Role     @default(SCHOOL_ADMIN)
   isDeleted Boolean  @default(false)
+  deletedAt DateTime?
 
   // --- Relations ---
 
@@ -255,6 +256,7 @@ model AcademicYear {
   endDate   DateTime
   isCurrent Boolean  @default(false)
   isDeleted Boolean  @default(false)
+  deletedAt DateTime?
 
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -286,6 +288,9 @@ model Class {
 
   tuitionFee Float @default(0) // Fee for this class
 
+  isDeleted Boolean @default(false)
+  deletedAt DateTime?
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   attendances Attendance[]
@@ -303,6 +308,9 @@ model Subject {
 
   teacherId String?
   teacher   User?   @relation("TeacherSubjects", fields: [teacherId], references: [id])
+
+  isDeleted Boolean @default(false)
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -375,6 +383,7 @@ model Expense {
   recordedBy   User?   @relation("ExpenseRecorder", fields: [recordedById], references: [id])
 
   isDeleted Boolean @default(false)
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

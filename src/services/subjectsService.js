@@ -82,7 +82,8 @@ exports.getAllSubjectsService = async (schoolId) => {
             where: {
                 class: {
                     schoolId: schoolId
-                }
+                },
+                isDeleted: false
             },
             include: {
                 class: {
@@ -122,7 +123,8 @@ exports.getSubjectByIdService = async (schoolId, id) => {
         const subject = await prisma.subject.findFirst({
             where: {
                 id: id,
-                class: { schoolId: schoolId }
+                class: { schoolId: schoolId },
+                isDeleted: false
             },
             include: {
                 class: {
@@ -159,7 +161,7 @@ exports.updateSubjectService = async (schoolId, subjectIdValue, reqData) => {
 
     // 1. Check if subject exists and belongs to this school
     const existingSubject = await prisma.subject.findFirst({
-        where: { id, class: { schoolId } },
+        where: { id, class: { schoolId }, isDeleted: false },
         select: { id: true, name: true, classId: true }
     });
 
@@ -237,7 +239,7 @@ exports.deleteSubjectService = async (schoolId, subjectIdValue) => {
 
     // 1. Check if subject exists and belongs to this school
     const existingSubject = await prisma.subject.findFirst({
-        where: { id, class: { schoolId } },
+        where: { id, class: { schoolId }, isDeleted: false },
         select: { id: true, name: true, classId: true }
     });
 
@@ -247,9 +249,14 @@ exports.deleteSubjectService = async (schoolId, subjectIdValue) => {
         throw error;
     }
 
-    // 2. Delete subject
-    const deletedSubject = await prisma.subject.delete({
+    // 2. Delete subject (Soft Delete)
+    const deletedSubject = await prisma.subject.update({
         where: { id },
+        data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            name: `${existingSubject.name}_deleted_${Date.now()}`
+        },
         include: {
             class: { select: { name: true } },
             teacher: { select: { firstName: true, lastName: true } }

@@ -25,6 +25,7 @@ app.use('/api/grades', require('./routes/gradesRoutes'));
 app.use('/api/subscriptions', require('./routes/subscriptionRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
+app.use('/api/archive', require('./routes/archiveRoutes'));
 
 // Error Handler Middleware (Must be last)
 app.use(require('./middleware/errorHandler'));
