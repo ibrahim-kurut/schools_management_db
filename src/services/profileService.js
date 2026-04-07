@@ -74,10 +74,47 @@ exports.getUserProfileService = async (userId) => {
             };
         } else if (user.role === 'TEACHER') {
             const { gradesAsStudent, paymentsMade, ...teacherProfile } = userData;
+
+            // 1. Count grades entered by this teacher
+            const gradesEnteredCount = await prisma.grade.count({
+                where: { teacherId: userId }
+            });
+
+            // 2. Fetch latest grades entered for "Recent Activities"
+            const latestGrades = await prisma.grade.findMany({
+                where: { teacherId: userId },
+                include: {
+                    student: { select: { firstName: true, lastName: true } },
+                    subject: { select: { name: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 5
+            });
+
+            // 3. Calculate attendance rate
+            const attendanceRecords = user.attendanceRecords || [];
+            const totalAttendance = attendanceRecords.length;
+            const presentAttendance = attendanceRecords.filter(r => r.status === 'PRESENT').length;
+            const attendanceRate = totalAttendance > 0 ? Math.round((presentAttendance / totalAttendance) * 100) : 100;
+
             return {
                 status: "SUCCESS",
                 message: "Teacher profile retrieved",
-                user: teacherProfile
+                user: {
+                    ...teacherProfile,
+                    stats: {
+                        gradesEnteredCount,
+                        attendanceRate,
+                        latestSalary: user.salariesReceived?.[0]?.amount || 0
+                    },
+                    latestActivities: latestGrades.map(g => ({
+                        id: g.id,
+                        type: 'GRADE_ADDED',
+                        message: `تم رصد درجة الطالب ${g.student.firstName} ${g.student.lastName} في مادة ${g.subject.name}`,
+                        time: g.createdAt,
+                        icon: '📝'
+                    }))
+                }
             };
         } else {
             // Admin, Assistant, Accountant, etc.
