@@ -9,7 +9,7 @@ const { calculateAveragesIfNeeded } = require("./gradeCalculations");
  * @access private (school admin, teacher)
  */
 exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
-    const { studentId, subjectId, academicYearId, examType, score } = gradeData;
+    const { studentId, subjectId, academicYearId, examType, score, notes } = gradeData;
 
     // 1. Initial Validation
     if (CALCULATED_EXAM_TYPES.includes(examType)) {
@@ -72,6 +72,7 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
             const newGrade = await tx.grade.create({
                 data: {
                     score,
+                    notes,
                     examType,
                     isCalculated: false,
                     studentId,
@@ -290,7 +291,7 @@ exports.getSubjectTeacherStudentGradesService = async (schoolId, teacherId, stud
  */
 
 exports.updateGradeService = async (studentId, updateData, schoolId, userId, userRole) => {
-    const { gradeId, score, examType } = updateData;
+    const { gradeId, score, notes, examType } = updateData;
 
     // 1. Fetch existing grade and check student context
     const existingGrade = await prisma.grade.findFirst({
@@ -341,6 +342,7 @@ exports.updateGradeService = async (studentId, updateData, schoolId, userId, use
                 where: { id: gradeId },
                 data: {
                     ...(score !== undefined && { score }),
+                    ...(notes !== undefined && { notes }),
                     ...(examType !== undefined && { examType }),
                     updatedAt: new Date()
                 },
@@ -380,3 +382,115 @@ exports.updateGradeService = async (studentId, updateData, schoolId, userId, use
     }
 };
 
+/**
+ * @description delete grade
+ * @route DELETE /api/grades/:gradeId
+ * @method DELETE
+ * @access private (school admin, assistant and subject teacher only)
+ */
+exports.deleteGradeService = async (gradeId, schoolId, userId, userRole) => {
+    const existingGrade = await prisma.grade.findFirst({
+        where: { id: gradeId },
+        include: {
+            subject: {
+                select: {
+                    teacherId: true,
+                    class: { select: { schoolId: true } }
+                }
+            }
+        }
+    });
+
+    if (!existingGrade) {
+        throw { statusCode: 404, message: "Grade not found" };
+    }
+
+    if (existingGrade.subject.class.schoolId !== schoolId) {
+        throw { statusCode: 403, message: "Unauthorized access to this school's data" };
+    }
+
+    if (existingGrade.isCalculated) {
+        throw { statusCode: 400, message: "Cannot manually delete automatically calculated grades" };
+    }
+
+    const isAdmin = userRole === 'SCHOOL_ADMIN';
+    const isAssistant = userRole === 'ASSISTANT';
+    const isTeacher = userRole === 'TEACHER';
+    const isSubjectTeacher = existingGrade.subject.teacherId === userId;
+    const isGradeCreator = existingGrade.teacherId === userId;
+
+    if (!isAdmin && !isAssistant) {
+        if (!isTeacher || (!isSubjectTeacher && !isGradeCreator)) {
+            throw { statusCode: 403, message: "You do not have permission to delete this grade" };
+        }
+    }
+
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const deleted = await tx.grade.delete({
+                where: { id: gradeId }
+            });
+
+            await calculateAveragesIfNeeded(
+                tx,
+                existingGrade.studentId,
+                existingGrade.subjectId,
+                existingGrade.academicYearId,
+                userId
+            );
+
+            return deleted;
+        });
+
+        return result;
+
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * @description get all grades for a specific class taught by the teacher
+ * @route GET /api/grades/teacher-class/:classId
+ */
+exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, academicYearId = null) => {
+    let filterYearId = academicYearId;
+    if (!filterYearId) {
+        const currentYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isCurrent: true, isDeleted: false },
+            select: { id: true }
+        });
+        if (currentYear) filterYearId = currentYear.id;
+    }
+
+    const whereClause = {
+        subject: { classId, schoolId },
+        OR: [
+            { teacherId: teacherId },
+            { subject: { teacherId: teacherId } }
+        ]
+    };
+
+    if (filterYearId) {
+        whereClause.academicYearId = filterYearId;
+    }
+
+    const grades = await prisma.grade.findMany({
+        where: whereClause,
+        select: {
+            id: true,
+            score: true,
+            notes: true,
+            examType: true,
+            subject: { select: { id: true, name: true } },
+            academicYear: { select: { name: true } },
+            studentId: true
+        },
+        orderBy: [
+            { subject: { name: 'asc' } },
+            { examType: 'asc' }
+        ]
+    });
+
+    return grades;
+};

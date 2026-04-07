@@ -1,4 +1,4 @@
-const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService, updateGradeService } = require("../services/gradesService");
+const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService, updateGradeService, deleteGradeService, getTeacherClassGradesService } = require("../services/gradesService");
 const { createGradeSchema, updateGradeSchema } = require("../utils/gradesValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
@@ -184,5 +184,56 @@ exports.updateGradeController = asyncHandler(async (req, res) => {
         success: true,
         message: "Grade updated successfully",
         grade: updatedGrade
+    });
+});
+
+/**
+ * @description delete grade
+ * @route DELETE /api/grades/:gradeId
+ * @method DELETE
+ * @access private
+ */
+exports.deleteGradeController = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { gradeId } = req.params;
+
+    const { error: gradeIdError } = validateId(gradeId);
+    if (gradeIdError) {
+        return res.status(400).json({ success: false, message: "Invalid grade identity" });
+    }
+
+    await deleteGradeService(gradeId, schoolId, userId, userRole);
+
+    return res.status(200).json({ success: true, message: "Grade deleted successfully" });
+});
+
+/**
+ * @description get all grades for a class taught by the teacher
+ * @route GET /api/grades/teacher-class/:classId
+ * @method GET
+ * @access private (teacher only)
+ */
+exports.getTeacherClassGradesController = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+    const teacherId = req.user.id;
+    const { classId } = req.params;
+    const { academicYearId } = req.query;
+
+    const { error: classIdError } = validateId(classId);
+    if (classIdError) return res.status(400).json({ success: false, message: classIdError.details[0].message });
+
+    if (academicYearId) {
+        const { error: yearIdError } = validateId(academicYearId);
+        if (yearIdError) return res.status(400).json({ success: false, message: yearIdError.details[0].message });
+    }
+
+    const grades = await getTeacherClassGradesService(schoolId, teacherId, classId, academicYearId);
+
+    return res.status(200).json({
+        success: true,
+        message: "Class grades retrieved successfully",
+        grades
     });
 });

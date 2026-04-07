@@ -57,11 +57,19 @@ const createGradeSchema = Joi.object({
     score: Joi.number()
         .min(0)
         .max(100)
-        .required()
+        .optional()
+        .allow(null)
         .messages({
             'number.min': 'Score must be at least 0',
-            'number.max': 'Score must be at most 100',
-            'any.required': 'Score is required'
+            'number.max': 'Score must be at most 100'
+        }),
+
+    notes: Joi.string()
+        .max(255)
+        .optional()
+        .allow('', null)
+        .messages({
+            'string.max': 'Notes must be at most 255 characters'
         }),
 });
 
@@ -88,9 +96,18 @@ const updateGradeSchema = Joi.object({
         .min(0)
         .max(100)
         .optional()
+        .allow(null)
         .messages({
             'number.min': 'Score must be at least 0',
             'number.max': 'Score must be at most 100',
+        }),
+
+    notes: Joi.string()
+        .max(255)
+        .optional()
+        .allow('', null)
+        .messages({
+            'string.max': 'Notes must be at most 255 characters'
         }),
 
     examType: Joi.string()

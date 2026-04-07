@@ -427,7 +427,8 @@ model Attendance {
 
 model Grade {
   id           String   @id @default(uuid())
-  score        Float // الدرجة التي حصل عليها الطالب (0-100)
+  score        Float?   // الدرجة (اختيارية لدعم المؤجلين)
+  notes        String?  // اختياري لكتابة (غائب، مؤجل، إلخ)
   examType     ExamType // نوع الامتحان
   isCalculated Boolean  @default(false) // هل الدرجة محسوبة تلقائياً؟
 
