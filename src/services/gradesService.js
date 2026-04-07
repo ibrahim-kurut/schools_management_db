@@ -87,6 +87,8 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
                     isCalculated: true,
                     createdAt: true,
                     updatedAt: true,
+                    studentId: true,
+                    subjectId: true,
                     student: { select: { firstName: true, lastName: true } },
                     subject: { select: { name: true } },
                     academicYear: { select: { name: true } }
@@ -353,6 +355,8 @@ exports.updateGradeService = async (studentId, updateData, schoolId, userId, use
                     isCalculated: true,
                     createdAt: true,
                     updatedAt: true,
+                    studentId: true,
+                    subjectId: true,
                     student: { select: { firstName: true, lastName: true } },
                     subject: { select: { name: true } },
                     academicYear: { select: { name: true } }
@@ -453,7 +457,7 @@ exports.deleteGradeService = async (gradeId, schoolId, userId, userRole) => {
  * @description get all grades for a specific class taught by the teacher
  * @route GET /api/grades/teacher-class/:classId
  */
-exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, academicYearId = null) => {
+exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, academicYearId = null, subjectId = null) => {
     let filterYearId = academicYearId;
     if (!filterYearId) {
         const currentYear = await prisma.academicYear.findFirst({
@@ -464,12 +468,17 @@ exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, acad
     }
 
     const whereClause = {
-        subject: { classId, schoolId },
         OR: [
             { teacherId: teacherId },
             { subject: { teacherId: teacherId } }
         ]
     };
+
+    if (subjectId) {
+        whereClause.subjectId = subjectId;
+    } else if (classId) {
+        whereClause.subject = { classId, schoolId };
+    }
 
     if (filterYearId) {
         whereClause.academicYearId = filterYearId;
@@ -482,6 +491,7 @@ exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, acad
             score: true,
             notes: true,
             examType: true,
+            subjectId: true,
             subject: { select: { id: true, name: true } },
             academicYear: { select: { name: true } },
             studentId: true

@@ -139,7 +139,25 @@ exports.getUserProfileService = async (userId) => {
  */
 exports.getTeacherStudentsService = async (teacherId) => {
     try {
-        // 1. Find all classes where the teacher is teaching a subject
+        // 1. Get the teacher's schoolId and the current academic year for that school
+        const teacher = await prisma.user.findUnique({
+            where: { id: teacherId },
+            select: { schoolId: true }
+        });
+
+        if (!teacher || !teacher.schoolId) {
+            throw { statusCode: 404, message: "Teacher or School not found" };
+        }
+
+        const currentYear = await prisma.academicYear.findFirst({
+            where: {
+                schoolId: teacher.schoolId,
+                isCurrent: true
+            },
+            select: { id: true }
+        });
+
+        // 2. Find all classes where the teacher is teaching a subject
         const teacherClasses = await prisma.class.findMany({
             where: {
                 subjects: {
@@ -162,15 +180,24 @@ exports.getTeacherStudentsService = async (teacherId) => {
                 },
                 subjects: {
                     where: { teacherId: teacherId },
-                    select: { name: true }
+                    select: {
+                        id: true, // Crucial fix: include subject ID
+                        name: true
+                    }
                 }
             }
         });
 
+        // 3. Attach academicYearId to each class for the frontend to use
+        const enhancedClasses = teacherClasses.map(cls => ({
+            ...cls,
+            academicYearId: currentYear?.id || null
+        }));
+
         return {
             status: "SUCCESS",
             message: "Teacher classes and students retrieved",
-            classes: teacherClasses
+            classes: enhancedClasses
         };
     } catch (error) {
         throw error;

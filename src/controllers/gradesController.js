@@ -10,12 +10,10 @@ const asyncHandler = require("../utils/asyncHandler");
  * @access private (school admin, teacher)
  */
 exports.createGradeController = asyncHandler(async (req, res) => {
-    // 0. Get user info from token
     const schoolId = req.user.schoolId;
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // 1. Validate the request body
     const { error, value: gradeData } = createGradeSchema.validate(req.body);
     if (error) {
         return res.status(400).json({
@@ -24,10 +22,8 @@ exports.createGradeController = asyncHandler(async (req, res) => {
         });
     }
 
-    // 2. Call service to create grade
     const newGrade = await createGradeService(gradeData, schoolId, userId, userRole);
 
-    // 3. Return success response
     return res.status(201).json({
         success: true,
         message: "Grade created successfully",
@@ -44,10 +40,9 @@ exports.createGradeController = asyncHandler(async (req, res) => {
 exports.getGradesByStudentIdController = asyncHandler(async (req, res) => {
     const schoolId = req.user.schoolId;
     const { studentId } = req.params;
-    const { academicYearId } = req.query; // Get academicYearId from query params
+    const { academicYearId } = req.query;
     const userRole = req.user.role;
 
-    //1. validate studentId
     const { error: studentIdError } = validateId(studentId);
     if (studentIdError) {
         return res.status(400).json({
@@ -55,7 +50,6 @@ exports.getGradesByStudentIdController = asyncHandler(async (req, res) => {
         });
     }
 
-    // Validate academicYearId if provided
     if (academicYearId) {
         const { error: yearIdError } = validateId(academicYearId);
         if (yearIdError) {
@@ -65,10 +59,8 @@ exports.getGradesByStudentIdController = asyncHandler(async (req, res) => {
         }
     }
 
-    //2. call service and pass schoolId, studentId, and optional academicYearId
     const grades = await getGradesByStudentIdService(studentId, schoolId, userRole, academicYearId);
 
-    //3. Return success response
     return res.status(200).json({
         success: true,
         message: "Grades retrieved successfully",
@@ -82,13 +74,11 @@ exports.getGradesByStudentIdController = asyncHandler(async (req, res) => {
  * @method GET
  * @access private (student only )
  */
-
 exports.getStudentGradesController = asyncHandler(async (req, res) => {
     const schoolId = req.user.schoolId;
-    const studentId = req.user.id; // Use the authenticated student's ID
+    const studentId = req.user.id;
     const userRole = req.user.role;
 
-    // Ensure user is a student
     if (userRole !== 'STUDENT') {
         return res.status(403).json({
             success: false,
@@ -96,7 +86,6 @@ exports.getStudentGradesController = asyncHandler(async (req, res) => {
         });
     }
 
-    // Call service to get student's grades for current academic year
     const grades = await getStudentGradesService(studentId, schoolId, userRole);
 
     return res.status(200).json({
@@ -112,14 +101,12 @@ exports.getStudentGradesController = asyncHandler(async (req, res) => {
  * @method GET
  * @access private (subject teacher only )
  */
-
 exports.getSubjectTeacherStudentGradesController = asyncHandler(async (req, res) => {
     const schoolId = req.user.schoolId;
     const teacherId = req.user.id;
     const { studentId } = req.params;
     const { academicYearId } = req.query;
 
-    // Validate studentId
     const { error: studentIdError } = validateId(studentId);
     if (studentIdError) {
         return res.status(400).json({
@@ -127,7 +114,6 @@ exports.getSubjectTeacherStudentGradesController = asyncHandler(async (req, res)
         });
     }
 
-    // Validate academicYearId if provided
     if (academicYearId) {
         const { error: yearIdError } = validateId(academicYearId);
         if (yearIdError) {
@@ -152,14 +138,12 @@ exports.getSubjectTeacherStudentGradesController = asyncHandler(async (req, res)
  * @method PUT
  * @access private (subject teacher only )
  */
-
 exports.updateGradeController = asyncHandler(async (req, res) => {
     const schoolId = req.user.schoolId;
     const userId = req.user.id;
     const userRole = req.user.role;
     const { studentId } = req.params;
 
-    // 1. Validate studentId from params
     const { error: studentIdError } = validateId(studentId);
     if (studentIdError) {
         return res.status(400).json({
@@ -168,7 +152,6 @@ exports.updateGradeController = asyncHandler(async (req, res) => {
         });
     }
 
-    // 2. Validate request body
     const { error: bodyError, value: updateData } = updateGradeSchema.validate(req.body);
     if (bodyError) {
         return res.status(400).json({
@@ -177,7 +160,6 @@ exports.updateGradeController = asyncHandler(async (req, res) => {
         });
     }
 
-    // 3. Call service to update grade
     const updatedGrade = await updateGradeService(studentId, updateData, schoolId, userId, userRole);
 
     return res.status(200).json({
@@ -219,7 +201,7 @@ exports.getTeacherClassGradesController = asyncHandler(async (req, res) => {
     const schoolId = req.user.schoolId;
     const teacherId = req.user.id;
     const { classId } = req.params;
-    const { academicYearId } = req.query;
+    const { academicYearId, subjectId } = req.query;
 
     const { error: classIdError } = validateId(classId);
     if (classIdError) return res.status(400).json({ success: false, message: classIdError.details[0].message });
@@ -229,7 +211,12 @@ exports.getTeacherClassGradesController = asyncHandler(async (req, res) => {
         if (yearIdError) return res.status(400).json({ success: false, message: yearIdError.details[0].message });
     }
 
-    const grades = await getTeacherClassGradesService(schoolId, teacherId, classId, academicYearId);
+    if (subjectId) {
+        const { error: subIdError } = validateId(subjectId);
+        if (subIdError) return res.status(400).json({ success: false, message: subIdError.details[0].message });
+    }
+
+    const grades = await getTeacherClassGradesService(schoolId, teacherId, classId, academicYearId, subjectId);
 
     return res.status(200).json({
         success: true,
