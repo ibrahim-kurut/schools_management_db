@@ -368,7 +368,7 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
 
     if (requesterRole === "ASSISTANT") {
         // 5. Assistant: Can edit only limited fields
-        const allowedFieldsForAssistant = ['firstName', 'lastName', 'phone', 'gender', 'birthDate'];
+        const allowedFieldsForAssistant = ['firstName', 'lastName', 'phone', 'gender', 'birthDate', 'motherName', 'guardianMaritalStatus'];
 
         dataToUpdate = {};
         for (const field of allowedFieldsForAssistant) {
@@ -439,8 +439,14 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
             }
         }
 
-        // Handle Student Financial Details
-        if (targetMember.role === "STUDENT" && (dataToUpdate.customTuitionFee !== undefined || dataToUpdate.discountAmount !== undefined || dataToUpdate.discountNotes !== undefined)) {
+        // Handle Student Financial Details & Profile
+        if (targetMember.role === "STUDENT" && (
+            dataToUpdate.customTuitionFee !== undefined ||
+            dataToUpdate.discountAmount !== undefined ||
+            dataToUpdate.discountNotes !== undefined ||
+            dataToUpdate.motherName !== undefined ||
+            dataToUpdate.guardianMaritalStatus !== undefined
+        )) {
             dataToUpdate.studentProfile = {
                 upsert: {
                     update: {
