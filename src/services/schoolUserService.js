@@ -10,19 +10,35 @@ const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
  * @access private (school owner)
  */
 exports.addMemberService = async (requesterId, memberData, file, requesterRole) => {
-    // 1. Get School for the Requester (Owner) & Include Plan
-    const school = await prisma.school.findUnique({
-        where: { ownerId: requesterId },
-        include: {
-            subscription: {
-                include: { plan: true }
-            },
-            classes: true
+    // 1. Get School context based on requester role
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({
+            where: { ownerId: requesterId },
+            include: {
+                subscription: { include: { plan: true } },
+                classes: true
+            }
+        });
+    } else {
+        // For staff (Assistant), get school via their schoolId
+        const requester = await prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { schoolId: true }
+        });
+        if (requester?.schoolId) {
+            school = await prisma.school.findUnique({
+                where: { id: requester.schoolId },
+                include: {
+                    subscription: { include: { plan: true } },
+                    classes: true
+                }
+            });
         }
-    });
+    }
 
     if (!school) {
-        throw new Error("School not found for this user");
+        throw new Error("مدرسة غير موجودة أو انتهت صلاحية الجلسة");
     }
 
     // 2. Check Subscription Status
@@ -32,9 +48,9 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
 
     const memberRole = memberData.role;
 
-    // 2.5 Role Restriction: Assistant can only create TEACHER or STUDENT
-    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'STUDENT'].includes(memberRole)) {
-        throw new Error("Assistants can only add Teachers or Students");
+    // 2.5 Role Restriction: Assistant can only create TEACHER, ACCOUNTANT or STUDENT
+    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'ACCOUNTANT', 'STUDENT'].includes(memberRole)) {
+        throw new Error("بصفتك معاون، يمكنك إضافة (معلمين، محاسبين، طلاب) فقط.");
     }
 
     let targetClassId = null;
@@ -176,17 +192,32 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
  * @access private (school owner)
  */
 
-exports.getAllMembersService = async (requesterId, page, limit, searchWord, roleFilter) => {
+exports.getAllMembersService = async (requesterId, page, limit, searchWord, roleFilter, requesterRole) => {
     const skip = (page - 1) * limit;
 
-    // 1. Get School Basic Info
-    const school = await prisma.school.findUnique({
-        where: { ownerId: requesterId },
-        select: { id: true, name: true, slug: true, logo: true }
-    });
+    // 1. Get School Basic Info based on roles
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({
+            where: { ownerId: requesterId },
+            select: { id: true, name: true, slug: true, logo: true }
+        });
+    } else {
+        // For staff, get school via their schoolId
+        const requester = await prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { schoolId: true }
+        });
+        if (requester?.schoolId) {
+            school = await prisma.school.findUnique({
+                where: { id: requester.schoolId },
+                select: { id: true, name: true, slug: true, logo: true }
+            });
+        }
+    }
 
     if (!school) {
-        throw new Error("School not found for this user");
+        throw new Error("المدرسة غير موجودة أو انتهت صلاحية الجلسة");
     }
 
     // 2. Build dynamic where clause
@@ -339,16 +370,32 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
  */
 
 exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, requesterRole) => {
-    // 1. Get School for the Requester (Owner)
-    const school = await prisma.school.findUnique({
-        where: { ownerId: ownerId },
-        include: {
-            members: { where: { id: memberId, isDeleted: false } }
+    // 1. Get School context based on requester role
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({
+            where: { ownerId: ownerId },
+            include: {
+                members: { where: { id: memberId, isDeleted: false } }
+            }
+        });
+    } else {
+        const requester = await prisma.user.findUnique({
+            where: { id: ownerId },
+            select: { schoolId: true }
+        });
+        if (requester?.schoolId) {
+            school = await prisma.school.findUnique({
+                where: { id: requester.schoolId },
+                include: {
+                    members: { where: { id: memberId, isDeleted: false } }
+                }
+            });
         }
-    });
+    }
 
     if (!school) {
-        throw new Error("School not found for this user");
+        throw new Error("المدرسة غير موجودة");
     }
 
     // 2. check if member exists in school
@@ -357,9 +404,9 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
         throw new Error("عضو غير موجود في هذه المدرسة");
     }
 
-    // 3. RBAC Check: Assistant can only update TEACHER or STUDENT
-    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'STUDENT'].includes(targetMember.role)) {
-        throw new Error("المعاون يمكنه تعديل بيانات المعلمين والطلاب فقط");
+    // 3. RBAC Check: Assistant can only update TEACHER, STUDENT, or ACCOUNTANT
+    if (requesterRole === 'ASSISTANT' && !['TEACHER', 'STUDENT', 'ACCOUNTANT'].includes(targetMember.role)) {
+        throw new Error("المعاون يمكنه تعديل بيانات المعلمين والطلاب والمحاسبين فقط");
     }
 
 

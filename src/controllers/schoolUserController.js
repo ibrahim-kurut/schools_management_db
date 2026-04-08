@@ -58,7 +58,7 @@ exports.getAllMembersController = asyncHandler(async (req, res) => {
     const roleFilter = validRoles.includes(roleFromQuery) ? roleFromQuery : undefined;
 
     // 3. Passing values to Service
-    const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord, roleFilter);
+    const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord, roleFilter, req.user.role);
 
     // 4. Format members to include className for students
     const formattedMembers = members.map(member => {
