@@ -109,7 +109,9 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
                                 : null,
                             customTuitionFee: (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'ACCOUNTANT')
                                 ? (memberData.customTuitionFee ? Number(memberData.customTuitionFee) : null)
-                                : null
+                                : null,
+                            motherName: memberData.motherName || null,
+                            guardianMaritalStatus: memberData.guardianMaritalStatus || null
                         }
                     }
                 })
@@ -232,7 +234,9 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
                 select: {
                     discountAmount: true,
                     discountNotes: true,
-                    customTuitionFee: true
+                    customTuitionFee: true,
+                    motherName: true,
+                    guardianMaritalStatus: true
                 }
             },
             class: {
@@ -301,7 +305,9 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
                 select: {
                     discountAmount: true,
                     discountNotes: true,
-                    customTuitionFee: true
+                    customTuitionFee: true,
+                    motherName: true,
+                    guardianMaritalStatus: true
                 }
             },
             subjects: {
@@ -441,17 +447,23 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
                         customTuitionFee: dataToUpdate.customTuitionFee !== undefined ? (dataToUpdate.customTuitionFee ? Number(dataToUpdate.customTuitionFee) : null) : undefined,
                         discountAmount: dataToUpdate.discountAmount !== undefined ? Number(dataToUpdate.discountAmount) : undefined,
                         discountNotes: dataToUpdate.discountNotes !== undefined ? dataToUpdate.discountNotes : undefined,
+                        motherName: dataToUpdate.motherName !== undefined ? dataToUpdate.motherName : undefined,
+                        guardianMaritalStatus: dataToUpdate.guardianMaritalStatus !== undefined ? dataToUpdate.guardianMaritalStatus : undefined,
                     },
                     create: {
                         customTuitionFee: dataToUpdate.customTuitionFee ? Number(dataToUpdate.customTuitionFee) : null,
                         discountAmount: dataToUpdate.discountAmount ? Number(dataToUpdate.discountAmount) : 0,
                         discountNotes: dataToUpdate.discountNotes || null,
+                        motherName: dataToUpdate.motherName || null,
+                        guardianMaritalStatus: dataToUpdate.guardianMaritalStatus || null,
                     }
                 }
             };
             delete dataToUpdate.customTuitionFee;
             delete dataToUpdate.discountAmount;
             delete dataToUpdate.discountNotes;
+            delete dataToUpdate.motherName;
+            delete dataToUpdate.guardianMaritalStatus;
         }
     }
 
@@ -477,7 +489,9 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
                 select: {
                     discountAmount: true,
                     discountNotes: true,
-                    customTuitionFee: true
+                    customTuitionFee: true,
+                    motherName: true,
+                    guardianMaritalStatus: true
                 }
             },
             class: {

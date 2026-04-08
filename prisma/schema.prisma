@@ -469,6 +469,9 @@ model StudentProfile {
 
   customTuitionFee Float? // Override for class tuitionFee
 
+  motherName             String?
+  guardianMaritalStatus String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

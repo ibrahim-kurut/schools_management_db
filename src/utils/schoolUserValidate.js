@@ -31,6 +31,14 @@ const addSchoolMemberSchema = Joi.object({
     discountAmount: Joi.number().min(0).optional(),
     customTuitionFee: Joi.number().min(0).allow(null, '').optional(),
     discountNotes: Joi.string().trim().allow(null, '').optional(),
+    motherName: Joi.string().trim().when('role', {
+        is: 'STUDENT',
+        then: Joi.required(),
+        otherwise: Joi.optional()
+    }).messages({
+        'any.required': 'Mother name is required for students'
+    }),
+    guardianMaritalStatus: Joi.string().trim().allow(null, '').optional(),
     role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').required().messages({
         'any.only': 'Role must be one of [TEACHER, ASSISTANT, STUDENT, ACCOUNTANT]',
         'any.required': 'Role is required'
@@ -50,6 +58,8 @@ const updateSchoolMemberSchema = Joi.object({
     discountAmount: Joi.number().min(0).optional(),
     customTuitionFee: Joi.number().min(0).allow(null, '').optional(),
     discountNotes: Joi.string().trim().empty('').optional(),
+    motherName: Joi.string().trim().empty('').optional(),
+    guardianMaritalStatus: Joi.string().trim().empty('').optional(),
     role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').empty('').optional(),
 });
 
