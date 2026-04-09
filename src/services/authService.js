@@ -98,7 +98,9 @@ exports.loginUser = async (email, password) => {
  * @method POST
  * @access private (assistant, teacher, accountant, school admin)
  */
-exports.loginUserBySchoolSlug = async (slug, email, password) => {
+exports.loginUserBySchoolSlug = async (slug, identifier, password) => {
+    // identifier can be email or studentCode
+    
     // 1. Find school by slug
     const school = await prisma.school.findUnique({
         where: { slug }
@@ -108,10 +110,13 @@ exports.loginUserBySchoolSlug = async (slug, email, password) => {
         throw new Error("School not found");
     }
 
-    // 2. Find user by email within this school (member or owner)
+    // 2. Determine search criteria
+    const isEmail = identifier.includes('@');
+    
+    // 3. Find user by identifier within this school (member or owner)
     const user = await prisma.user.findFirst({
         where: {
-            email,
+            ...(isEmail ? { email: identifier } : { studentCode: identifier }),
             OR: [
                 { schoolId: school.id },           // Member (teacher, student, assistant)
                 { ownedSchool: { id: school.id } } // Owner (school admin)
@@ -127,14 +132,14 @@ exports.loginUserBySchoolSlug = async (slug, email, password) => {
         throw new Error("Invalid credentials");
     }
 
-    // 3. Verify password
+    // 4. Verify password
     const isMatch = await comparePassword(password, user.password);
 
     if (!isMatch) {
         throw new Error("Invalid credentials");
     }
 
-    // 4. Generate token
+    // 5. Generate token
     const token = generateToken({
         id: user.id,
         role: user.role,
@@ -144,3 +149,4 @@ exports.loginUserBySchoolSlug = async (slug, email, password) => {
 
     return { user, token };
 };
+

@@ -11,9 +11,15 @@ const createUserSchema = Joi.object({
 });
 
 const loginUserSchema = Joi.object({
-    email: Joi.string().trim().email().required(),
-    password: Joi.string().trim().required(),
+    // identifier can be email or studentCode
+    email: Joi.string().trim().required().messages({
+        "string.empty": "البريد الإلكتروني أو كود الطالب مطلوب",
+    }),
+    password: Joi.string().trim().required().messages({
+        "string.empty": "كلمة المرور مطلوبة",
+    }),
 });
+
 
 module.exports = {
     createUserSchema,

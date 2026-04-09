@@ -97,7 +97,8 @@ model User {
   id        String   @id @default(uuid())
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
-  email     String   @unique
+  studentCode String?  @map("student_code")
+  email       String   @unique
   phone     String?
   password  String
   image     String?  // Profile picture URL (stored in Supabase)
@@ -216,6 +217,8 @@ model Subscription {
   status    Status   @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, studentCode])
 }
 
 // --------------------------------------

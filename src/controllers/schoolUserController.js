@@ -1,7 +1,25 @@
-const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService, deleteMemberByIdService } = require("../services/schoolUserService");
+const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService, deleteMemberByIdService, checkStudentCodeService } = require("../services/schoolUserService");
 const { addSchoolMemberSchema, updateSchoolMemberSchema } = require("../utils/schoolUserValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
+
+/**
+ * @description Check if a student code is available
+ * @route GET /api/school-user/check-code/:code
+ * @method GET
+ * @access private (school owner/assistant)
+ */
+exports.checkStudentCodeController = asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    
+    if (!code) {
+        return res.status(400).json({ message: "كود الطالب مطلوب" });
+    }
+
+    const result = await checkStudentCodeService(req.user.id, code, req.user.role);
+
+    res.status(200).json(result);
+});
 
 /**
  * @description Add a new member to a school

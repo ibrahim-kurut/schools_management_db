@@ -9,13 +9,28 @@ const addSchoolMemberSchema = Joi.object({
         'string.empty': 'Last name is required',
         'any.required': 'Last name is required'
     }),
-    email: Joi.string().trim().email().required().messages({
-        'string.email': 'Please provide a valid email',
-        'any.required': 'Email is required'
+    email: Joi.string().trim().email().when('role', {
+        is: 'STUDENT',
+        then: Joi.optional(),
+        otherwise: Joi.required()
+    }).messages({
+        'string.email': 'يرجى إدخال بريد إلكتروني صحيح',
+        'any.required': 'البريد الإلكتروني مطلوب'
     }),
-    password: Joi.string().trim().min(6).required().messages({
-        'string.min': 'Password must be at least 6 characters long',
-        'any.required': 'Password is required'
+    password: Joi.string().trim().min(6).when('role', {
+        is: 'STUDENT',
+        then: Joi.optional(),
+        otherwise: Joi.required()
+    }).messages({
+        'string.min': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+        'any.required': 'كلمة المرور مطلوبة'
+    }),
+    studentCode: Joi.string().trim().when('role', {
+        is: 'STUDENT',
+        then: Joi.required(),
+        otherwise: Joi.optional()
+    }).messages({
+        'any.required': 'كود الطالب مطلوب'
     }),
     phone: Joi.string().trim().allow(null, '').optional(),
     gender: Joi.string().trim().valid('MALE', 'FEMALE').required().messages({

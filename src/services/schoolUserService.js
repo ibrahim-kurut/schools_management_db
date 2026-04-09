@@ -87,23 +87,50 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
         }
     }
 
-    // 5. Check if user email already exists
+    // 5. Build Final Member Data
+    let finalEmail = memberData.email;
+    let finalPassword = memberData.password;
+
+    // --- Student Special Handling ---
+    if (memberRole === "STUDENT") {
+        // A. Verify studentCode is unique within school
+        const existingCode = await prisma.user.findFirst({
+            where: { schoolId: school.id, studentCode: memberData.studentCode, isDeleted: false }
+        });
+        if (existingCode) {
+            throw new Error(`كود الطالب (${memberData.studentCode}) مستخدم بالفعل في هذه المدرسة`);
+        }
+
+        // B. Generate Internal Email if not provided (or always move to internal if requested)
+        if (!finalEmail || finalEmail.trim() === "") {
+            const { generateInternalEmail } = require("../utils/emailGenerator");
+            finalEmail = generateInternalEmail(memberData.studentCode, school.id);
+        }
+
+        // C. Default password to phone number if not provided
+        if (!finalPassword || finalPassword.trim() === "") {
+            finalPassword = memberData.phone; 
+        }
+    }
+
+    // 5.5 Check if user email globally exists
     const existingUser = await prisma.user.findUnique({
-        where: { email: memberData.email }
+        where: { email: finalEmail }
     });
 
     if (existingUser) {
-        throw new Error("User with this email already exists");
+        throw new Error("هذا البريد الإلكتروني مسجل مسبقاً في النظام");
     }
 
     // 6. Hash Password & Create User
-    const hashedPassword = await hashPassword(memberData.password);
+    const hashedPassword = await hashPassword(finalPassword);
 
     const newUser = await prisma.user.create({
         data: {
             firstName: memberData.firstName,
             lastName: memberData.lastName,
-            email: memberData.email,
+            email: finalEmail,
+            studentCode: memberData.studentCode || null,
             password: hashedPassword,
             phone: memberData.phone,
             gender: memberData.gender,
@@ -254,6 +281,7 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
             id: true,
             firstName: true,
             lastName: true,
+            studentCode: true,
             email: true,
             phone: true,
             gender: true,
@@ -318,6 +346,7 @@ exports.getMemberByIdService = async (ownerId, memberId) => {
             id: true,
             firstName: true,
             lastName: true,
+            studentCode: true,
             email: true,
             phone: true,
             gender: true,
@@ -529,6 +558,7 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
             id: true,
             firstName: true,
             lastName: true,
+            studentCode: true,
             email: true,
             phone: true,
             gender: true,
@@ -600,6 +630,7 @@ exports.deleteMemberByIdService = async (ownerId, memberId) => {
             id: true,
             firstName: true,
             lastName: true,
+            studentCode: true,
             email: true,
             phone: true,
             gender: true,
@@ -618,10 +649,31 @@ exports.deleteMemberByIdService = async (ownerId, memberId) => {
 
 
 
-//*! TODO
+// --- Helper Services ---
+
 /**
- *? GET /profile - User profile (for logged-in user to see their own data)
- *? GET /school-user/:id/grades - Detailed grades for a member
- *? GET /school-user/:id/payments - Detailed payments for a member
- *? GET /school-user/:id/attendance - Attendance history for a member
+ * @description Check if a student code is available in a specific school
  */
+exports.checkStudentCodeService = async (requesterId, code, requesterRole) => {
+    // 1. Get School context
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({ where: { ownerId: requesterId } });
+    } else {
+        const requester = await prisma.user.findUnique({ where: { id: requesterId }, select: { schoolId: true } });
+        if (requester?.schoolId) school = await prisma.school.findUnique({ where: { id: requester.schoolId } });
+    }
+
+    if (!school) throw new Error("المدرسة غير موجودة");
+
+    // 2. Search for active student with this code in this school
+    const existing = await prisma.user.findFirst({
+        where: {
+            schoolId: school.id,
+            studentCode: code,
+            isDeleted: false
+        }
+    });
+
+    return { available: !existing };
+};
