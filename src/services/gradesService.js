@@ -457,7 +457,7 @@ exports.deleteGradeService = async (gradeId, schoolId, userId, userRole) => {
  * @description get all grades for a specific class taught by the teacher
  * @route GET /api/grades/teacher-class/:classId
  */
-exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, academicYearId = null, subjectId = null) => {
+exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, academicYearId = null, subjectId = null, userRole = 'TEACHER') => {
     let filterYearId = academicYearId;
     if (!filterYearId) {
         const currentYear = await prisma.academicYear.findFirst({
@@ -467,21 +467,31 @@ exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, acad
         if (currentYear) filterYearId = currentYear.id;
     }
 
-    const whereClause = {
-        OR: [
-            { teacherId: teacherId },
-            { subject: { teacherId: teacherId } }
-        ]
-    };
+    // Role-based where clause
+    // Managers and Assistants can see all grades for the school/class/subject
+    // Teachers can only see grades they created OR grades for subjects they teach
+    let whereClause = {};
+
+    if (userRole === 'SCHOOL_ADMIN' || userRole === 'ASSISTANT') {
+        whereClause = {
+            academicYearId: filterYearId,
+            subject: { schoolId }
+        };
+    } else {
+        whereClause = {
+            academicYearId: filterYearId,
+            OR: [
+                { teacherId: teacherId },
+                { subject: { teacherId: teacherId } }
+            ]
+        };
+    }
 
     if (subjectId) {
         whereClause.subjectId = subjectId;
     } else if (classId) {
-        whereClause.subject = { classId, schoolId };
-    }
-
-    if (filterYearId) {
-        whereClause.academicYearId = filterYearId;
+        // More robust subject filtering to ensure we stay within school
+        whereClause.subject = { ...(whereClause.subject || {}), classId, schoolId };
     }
 
     const grades = await prisma.grade.findMany({

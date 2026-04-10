@@ -216,7 +216,7 @@ exports.getTeacherClassGradesController = asyncHandler(async (req, res) => {
         if (subIdError) return res.status(400).json({ success: false, message: subIdError.details[0].message });
     }
 
-    const grades = await getTeacherClassGradesService(schoolId, teacherId, classId, academicYearId, subjectId);
+    const grades = await getTeacherClassGradesService(schoolId, teacherId, classId, academicYearId, subjectId, req.user.role);
 
     return res.status(200).json({
         success: true,

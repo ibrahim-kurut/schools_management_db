@@ -168,7 +168,7 @@ exports.getTeacherStudentsService = async (teacherId) => {
             },
             include: {
                 students: {
-                    where: { isDeleted: false },
+                    where: { isDeleted: false, role: 'STUDENT' },
                     select: {
                         id: true,
                         firstName: true,
