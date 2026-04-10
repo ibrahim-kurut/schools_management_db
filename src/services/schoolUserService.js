@@ -219,7 +219,7 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
  * @access private (school owner)
  */
 
-exports.getAllMembersService = async (requesterId, page, limit, searchWord, roleFilter, requesterRole) => {
+exports.getAllMembersService = async (requesterId, page, limit, searchWord, roleFilter, requesterRole, excludeRole) => {
     const skip = (page - 1) * limit;
 
     // 1. Get School Basic Info based on roles
@@ -264,6 +264,8 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
     // Add role filter only if provided
     if (roleFilter) {
         whereClause.role = roleFilter;
+    } else if (excludeRole) {
+        whereClause.role = { not: excludeRole };
     }
 
     // 3. Get Total Count of Members (for Pagination)
@@ -676,4 +678,209 @@ exports.checkStudentCodeService = async (requesterId, code, requesterRole) => {
     });
 
     return { available: !existing };
+};
+
+
+// =============================================
+// خدمة الرفع الجماعي للطلاب (Bulk Import)
+// =============================================
+
+/**
+ * @description جلب سياق المدرسة بناءً على دور المستخدم
+ * @param {string} requesterId - معرف المستخدم الطالب
+ * @param {string} requesterRole - دور المستخدم
+ * @returns {Object} المدرسة مع الاشتراك والخطة
+ */
+const getSchoolContext = async (requesterId, requesterRole) => {
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({
+            where: { ownerId: requesterId },
+            include: {
+                subscription: { include: { plan: true } },
+            }
+        });
+    } else {
+        const requester = await prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { schoolId: true }
+        });
+        if (requester?.schoolId) {
+            school = await prisma.school.findUnique({
+                where: { id: requester.schoolId },
+                include: {
+                    subscription: { include: { plan: true } },
+                }
+            });
+        }
+    }
+    return school;
+};
+
+/**
+ * @description خدمة الرفع الجماعي للطلاب من ملف إكسل
+ * @param {string} requesterId - معرف المستخدم المُنفّذ
+ * @param {string} requesterRole - دور المستخدم المُنفّذ
+ * @param {string} classId - معرف الصف الدراسي المختار
+ * @param {Array<Object>} students - مصفوفة الطلاب بعد التطهير من excelHelper
+ * @returns {Object} عدد الطلاب المضافين وتفاصيل إضافية
+ */
+exports.bulkImportStudentsService = async (requesterId, requesterRole, classId, students) => {
+    // 1. جلب سياق المدرسة
+    const school = await getSchoolContext(requesterId, requesterRole);
+
+    if (!school) {
+        throw new Error("المدرسة غير موجودة أو انتهت صلاحية الجلسة");
+    }
+
+    // 2. التحقق من حالة الاشتراك
+    if (school.subscription?.status !== "ACTIVE") {
+        throw new Error("اشتراك المدرسة غير فعّال. يرجى تجديد الاشتراك أولاً.");
+    }
+
+    // 3. التحقق من أن الصف ينتمي لهذه المدرسة
+    const targetClass = await prisma.class.findFirst({
+        where: { id: classId, schoolId: school.id, isDeleted: false }
+    });
+
+    if (!targetClass) {
+        throw new Error("الصف الدراسي المحدد غير موجود في هذه المدرسة.");
+    }
+
+    // 4. التحقق من حدود الخطة (عدد الطلاب المسموح)
+    const currentStudentsCount = await prisma.user.count({
+        where: { schoolId: school.id, role: "STUDENT", isDeleted: false }
+    });
+
+    const maxAllowed = school.subscription.plan.maxStudents;
+    const remainingSlots = maxAllowed - currentStudentsCount;
+
+    if (students.length > remainingSlots) {
+        throw new Error(
+            `تجاوز الحد المسموح به. لديك ${remainingSlots} مقعد متبقي من أصل ${maxAllowed}، ` +
+            `لكنك تحاول إضافة ${students.length} طالب.`
+        );
+    }
+
+    // 5. جلب آخر studentCode في المدرسة لتوليد الأكواد التلقائية
+    const lastStudent = await prisma.user.findFirst({
+        where: { schoolId: school.id, role: "STUDENT", studentCode: { not: null } },
+        orderBy: { studentCode: 'desc' },
+        select: { studentCode: true }
+    });
+
+    let nextCodeNumber = 1; // البداية الافتراضية
+    if (lastStudent && lastStudent.studentCode) {
+        const parsed = parseInt(lastStudent.studentCode, 10);
+        if (!isNaN(parsed)) {
+            nextCodeNumber = parsed + 1;
+        }
+    }
+
+    // 6. التحقق من الأكواد المتكررة أو الموجودة مسبقاً
+    const providedCodes = students
+        .filter(s => s.studentCode)
+        .map(s => s.studentCode);
+
+    if (providedCodes.length > 0) {
+        // التحقق من التكرار داخل الملف نفسه
+        const uniqueCodes = new Set(providedCodes);
+        if (uniqueCodes.size !== providedCodes.length) {
+            throw new Error("يوجد تكرار في أكواد الطلاب داخل الملف. يرجى التأكد من عدم تكرار أي كود.");
+        }
+
+        // التحقق من وجود الأكواد مسبقاً في قاعدة البيانات
+        const existingCodes = await prisma.user.findMany({
+            where: {
+                schoolId: school.id,
+                studentCode: { in: providedCodes },
+                isDeleted: false
+            },
+            select: { studentCode: true }
+        });
+
+        if (existingCodes.length > 0) {
+            const codes = existingCodes.map(u => u.studentCode).join(', ');
+            throw new Error(`الأكواد التالية مستخدمة مسبقاً في المدرسة: ${codes}`);
+        }
+    }
+
+    // 7. تجهيز بيانات كل طالب
+    const { generateInternalEmail } = require("../utils/emailGenerator");
+    const usersData = [];
+    const profilesData = [];
+
+    for (const student of students) {
+        // تحديد كود الطالب (من الإكسل أو توليد تلقائي)
+        let code;
+        if (student.studentCode) {
+            code = student.studentCode;
+        } else {
+            code = String(nextCodeNumber);
+            nextCodeNumber++;
+        }
+
+        // توليد الإيميل الداخلي
+        const email = generateInternalEmail(code, school.id);
+
+        // تشفير رقم هاتف ولي الأمر ليكون كلمة المرور
+        const hashedPassword = await hashPassword(student.parentPhone);
+
+        // استخدام البيانات كما جاءت من الإكسل (بعد التطهير في excelHelper)
+        usersData.push({
+            firstName: student.firstName,
+            lastName: student.lastName,
+            studentCode: code,
+            email,
+            phone: student.parentPhone,
+            password: hashedPassword,
+            gender: student.gender,
+            birthDate: new Date(student.birthDate),
+            role: 'STUDENT',
+            schoolId: school.id,
+            classId: targetClass.id,
+        });
+
+        // حفظ بيانات الملف الشخصي لإنشائها لاحقاً
+        profilesData.push({
+            studentCode: code,
+            motherName: student.motherName || null,
+            guardianMaritalStatus: student.guardianMaritalStatus || null,
+        });
+    }
+
+    // 8. الإدخال الجماعي في قاعدة البيانات (عملية واحدة لضمان السرعة)
+    const result = await prisma.user.createMany({
+        data: usersData,
+        skipDuplicates: true, // تخطي أي تكرار محتمل في الإيميل
+    });
+
+    // 9. إنشاء StudentProfile لكل طالب جديد (مع بيانات اسم الأم والحالة الاجتماعية)
+    const newStudents = await prisma.user.findMany({
+        where: {
+            schoolId: school.id,
+            studentCode: { in: usersData.map(u => u.studentCode) },
+            role: 'STUDENT',
+        },
+        select: { id: true, studentCode: true }
+    });
+
+    if (newStudents.length > 0) {
+        await prisma.studentProfile.createMany({
+            data: newStudents.map(s => {
+                const profileInfo = profilesData.find(p => p.studentCode === s.studentCode);
+                return {
+                    userId: s.id,
+                    motherName: profileInfo?.motherName || null,
+                    guardianMaritalStatus: profileInfo?.guardianMaritalStatus || null,
+                };
+            }),
+            skipDuplicates: true,
+        });
+    }
+
+    return {
+        importedCount: result.count,
+        className: targetClass.name,
+    };
 };

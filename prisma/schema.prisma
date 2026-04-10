@@ -97,7 +97,7 @@ model User {
   id        String   @id @default(uuid())
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
-  studentCode String?  @map("student_code")
+  studentCode String?
   email       String   @unique
   phone     String?
   password  String
@@ -149,6 +149,7 @@ model User {
   @@index([email])
   @@index([role])
   @@index([schoolId])
+  @@unique([schoolId, studentCode])
 }
 
 model School {
@@ -217,8 +218,6 @@ model Subscription {
   status    Status   @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([schoolId, studentCode])
 }
 
 // --------------------------------------

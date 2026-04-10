@@ -1,4 +1,4 @@
-const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService, deleteMemberByIdService, checkStudentCodeService } = require("../services/schoolUserService");
+const { addMemberService, getAllMembersService, getMemberByIdService, updateMemberByIdService, deleteMemberByIdService, checkStudentCodeService, bulkImportStudentsService } = require("../services/schoolUserService");
 const { addSchoolMemberSchema, updateSchoolMemberSchema } = require("../utils/schoolUserValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
@@ -71,12 +71,21 @@ exports.getAllMembersController = asyncHandler(async (req, res) => {
     // 2. Validate and set roleFilter
     const validRoles = ["TEACHER", "ASSISTANT", "ACCOUNTANT", "STUDENT"];
     const roleFromQuery = req.query.role?.toUpperCase();
+    const excludeRole = req.query.excludeRole?.toUpperCase();
 
     // If role is provided and valid, use it; otherwise, use undefined (no filter)
     const roleFilter = validRoles.includes(roleFromQuery) ? roleFromQuery : undefined;
 
     // 3. Passing values to Service
-    const { school, members, totalMembers } = await getAllMembersService(req.user.id, page, limit, searchWord, roleFilter, req.user.role);
+    const { school, members, totalMembers } = await getAllMembersService(
+        req.user.id, 
+        page, 
+        limit, 
+        searchWord, 
+        roleFilter, 
+        req.user.role,
+        excludeRole
+    );
 
     // 4. Format members to include className for students
     const formattedMembers = members.map(member => {
@@ -206,3 +215,82 @@ exports.deleteMemberByIdController = asyncHandler(async (req, res) => {
 });
 
 
+// =============================================
+// الرفع الجماعي للطلاب (Bulk Import)
+// =============================================
+
+/**
+ * @description رفع ملف إكسل لاستيراد عدة طلاب دفعة واحدة
+ * @route POST /api/school-user/import-students
+ * @method POST
+ * @access private (SCHOOL_ADMIN, ASSISTANT)
+ */
+exports.bulkImportStudentsController = asyncHandler(async (req, res) => {
+    const { parseExcelBuffer, sanitizeAndValidateRows } = require("../utils/excelHelper");
+
+    // 1. التحقق من وجود الملف
+    if (!req.file) {
+        return res.status(400).json({ message: "يرجى رفع ملف Excel أو CSV." });
+    }
+
+    // 2. التحقق من وجود classId
+    const { classId } = req.body;
+    if (!classId) {
+        return res.status(400).json({ message: "يرجى تحديد الصف الدراسي قبل رفع الملف." });
+    }
+
+    // 3. تحليل ملف الإكسل من الـ Buffer الموجود في الذاكرة
+    const { data: rawData, errors: parseErrors } = parseExcelBuffer(req.file.buffer);
+
+    if (parseErrors.length > 0) {
+        return res.status(400).json({
+            message: "حدثت أخطاء أثناء قراءة الملف.",
+            errors: parseErrors,
+        });
+    }
+
+    // 4. تطهير والتحقق من صحة البيانات
+    const { students, errors: validationErrors } = sanitizeAndValidateRows(rawData);
+
+    if (validationErrors.length > 0) {
+        return res.status(400).json({
+            message: "يوجد أخطاء في بيانات الملف. يرجى تصحيحها وإعادة المحاولة.",
+            errors: validationErrors,
+        });
+    }
+
+    if (students.length === 0) {
+        return res.status(400).json({ message: "لم يتم العثور على أي بيانات صالحة في الملف." });
+    }
+
+    // 5. استدعاء خدمة الاستيراد
+    const result = await bulkImportStudentsService(
+        req.user.id,
+        req.user.role,
+        classId,
+        students
+    );
+
+    // 6. الاستجابة بالنتيجة
+    res.status(201).json({
+        message: `تم استيراد ${result.importedCount} طالب بنجاح إلى الصف "${result.className}".`,
+        importedCount: result.importedCount,
+        className: result.className,
+    });
+});
+
+/**
+ * @description تحميل نموذج إكسل فارغ للرفع الجماعي
+ * @route GET /api/school-user/import-template
+ * @method GET
+ * @access private (SCHOOL_ADMIN, ASSISTANT)
+ */
+exports.downloadTemplateController = asyncHandler(async (req, res) => {
+    const { generateTemplate } = require("../utils/excelHelper");
+
+    const buffer = generateTemplate();
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="students_template.xlsx"');
+    res.send(buffer);
+});
