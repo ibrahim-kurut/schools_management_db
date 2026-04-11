@@ -1,4 +1,4 @@
-const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService, updateGradeService, deleteGradeService, getTeacherClassGradesService } = require("../services/gradesService");
+const { createGradeService, getGradesByStudentIdService, getStudentGradesService, getSubjectTeacherStudentGradesService, updateGradeService, deleteGradeService, getTeacherClassGradesService, getClassStudentResultsService } = require("../services/gradesService");
 const { createGradeSchema, updateGradeSchema } = require("../utils/gradesValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
@@ -222,5 +222,37 @@ exports.getTeacherClassGradesController = asyncHandler(async (req, res) => {
         success: true,
         message: "Class grades retrieved successfully",
         grades
+    });
+});
+
+/**
+ * @description Get all student results for a class (for admin viewing & printing)
+ * @route GET /api/grades/class/:classId/results
+ * @method GET
+ * @access private (SCHOOL_ADMIN, ASSISTANT)
+ */
+exports.getClassStudentResultsController = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+    const { classId } = req.params;
+    const { academicYearId } = req.query;
+
+    const { error: classIdError } = validateId(classId);
+    if (classIdError) {
+        return res.status(400).json({ success: false, message: classIdError.details[0].message });
+    }
+
+    if (academicYearId) {
+        const { error: yearIdError } = validateId(academicYearId);
+        if (yearIdError) {
+            return res.status(400).json({ success: false, message: yearIdError.details[0].message });
+        }
+    }
+
+    const results = await getClassStudentResultsService(schoolId, classId, academicYearId);
+
+    return res.status(200).json({
+        success: true,
+        message: "Student results retrieved successfully",
+        results
     });
 });

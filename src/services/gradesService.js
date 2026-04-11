@@ -514,3 +514,104 @@ exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, acad
 
     return grades;
 };
+
+/**
+ * @description Get all student results for a class (used by school admin/assistant for viewing & printing)
+ * Returns: class info, subjects, students with all their grades, school info, academic year
+ * @access private (SCHOOL_ADMIN, ASSISTANT)
+ */
+exports.getClassStudentResultsService = async (schoolId, classId, academicYearId = null) => {
+    // 1. Determine academic year
+    let filterYearId = academicYearId;
+    if (!filterYearId) {
+        const currentYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isCurrent: true, isDeleted: false },
+            select: { id: true, name: true }
+        });
+        if (!currentYear) throw { statusCode: 404, message: "لا توجد سنة دراسية حالية" };
+        filterYearId = currentYear.id;
+    }
+
+    // 2. Fetch class with subjects and students, plus school and academic year info - all in parallel
+    const [classData, school, academicYear] = await Promise.all([
+        prisma.class.findFirst({
+            where: { id: classId, schoolId, isDeleted: false },
+            select: {
+                id: true,
+                name: true,
+                subjects: {
+                    where: { isDeleted: false },
+                    select: { id: true, name: true },
+                    orderBy: { name: 'asc' }
+                },
+                students: {
+                    where: { role: 'STUDENT', isDeleted: false },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        gender: true
+                    },
+                    orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }]
+                }
+            }
+        }),
+        prisma.school.findUnique({
+            where: { id: schoolId },
+            select: {
+                id: true,
+                name: true,
+                logo: true,
+                owner: {
+                    select: { firstName: true, lastName: true }
+                }
+            }
+        }),
+        prisma.academicYear.findFirst({
+            where: { id: filterYearId, schoolId, isDeleted: false },
+            select: { id: true, name: true }
+        })
+    ]);
+
+    if (!classData) throw { statusCode: 404, message: "الصف غير موجود" };
+    if (!school) throw { statusCode: 404, message: "المدرسة غير موجودة" };
+    if (!academicYear) throw { statusCode: 404, message: "السنة الدراسية غير موجودة" };
+
+    // 3. Fetch all grades for all students in this class for the academic year
+    const studentIds = classData.students.map(s => s.id);
+    const subjectIds = classData.subjects.map(s => s.id);
+
+    const grades = await prisma.grade.findMany({
+        where: {
+            studentId: { in: studentIds },
+            subjectId: { in: subjectIds },
+            academicYearId: filterYearId
+        },
+        select: {
+            id: true,
+            score: true,
+            examType: true,
+            studentId: true,
+            subjectId: true
+        }
+    });
+
+    return {
+        classData: {
+            id: classData.id,
+            name: classData.name
+        },
+        subjects: classData.subjects,
+        students: classData.students,
+        grades,
+        school: {
+            name: school.name,
+            logo: school.logo,
+            adminName: `${school.owner.firstName} ${school.owner.lastName}`
+        },
+        academicYear: {
+            id: academicYear.id,
+            name: academicYear.name
+        }
+    };
+};
