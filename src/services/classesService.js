@@ -62,12 +62,35 @@ exports.createClassService = async (schoolId, classData) => {
  * @method GET
  * @access private (school owner and school assistant)
  */
-exports.getAllClassesService = async (schoolId) => {
+exports.getAllClassesService = async (schoolId, schoolSlug = null) => {
     try {
-        // 2. check if the school exists
+        let finalSchoolId = schoolId;
 
+        // If slug is provided, it takes priority as it represents the current UI context
+        if (schoolSlug) {
+            const decodedSlug = decodeURIComponent(schoolSlug);
+            const schoolBySlug = await prisma.school.findUnique({
+                where: { slug: decodedSlug }
+            });
+
+            if (schoolBySlug) {
+                finalSchoolId = schoolBySlug.id;
+            } else {
+                // Try case-insensitive just in case
+                const schoolInsensitive = await prisma.school.findFirst({
+                   where: { slug: { equals: decodedSlug, mode: 'insensitive' } }
+                });
+                if (schoolInsensitive) finalSchoolId = schoolInsensitive.id;
+            }
+        }
+
+        if (!finalSchoolId) {
+            return { status: "NOT_FOUND", message: "لم يتم العثور على مدرسة مرتبطة. يرجى تسجيل الخروج والدخول مرة أخرى." };
+        }
+
+        // 2. check if the school exists
         const school = await prisma.school.findUnique({
-            where: { id: schoolId }
+            where: { id: finalSchoolId }
         });
 
         if (!school) {
@@ -75,16 +98,20 @@ exports.getAllClassesService = async (schoolId) => {
         }
 
         // 0. Check Redis Cache
-        const cacheKey = `school:${schoolId}:classes`;
-        const cachedData = await redis.get(cacheKey);
-        if (cachedData) {
-            return JSON.parse(cachedData);
+        const cacheKey = `school:${finalSchoolId}:classes`;
+        try {
+            const cachedData = await redis.get(cacheKey);
+            if (cachedData) {
+                return JSON.parse(cachedData);
+            }
+        } catch (redisError) {
+            console.error("Redis Error:", redisError);
         }
 
         // 3. get all classes
         const classes = await prisma.class.findMany({
             where: {
-                schoolId,
+                schoolId: finalSchoolId,
                 isDeleted: false
             },
             select: {
@@ -107,7 +134,11 @@ exports.getAllClassesService = async (schoolId) => {
         };
 
         // 5. Save to Redis Cache (1 hour)
-        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+        try {
+            await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+        } catch (redisError) {
+            console.error("Redis Error:", redisError);
+        }
 
         return result;
     } catch (error) {

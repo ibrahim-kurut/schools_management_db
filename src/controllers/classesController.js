@@ -47,15 +47,12 @@ exports.createClassController = asyncHandler(async (req, res) => {
  * @access private (school owner)
  */
 exports.getAllClassesController = asyncHandler(async (req, res) => {
-    // 1. get school id from token
-    const schoolId = req.user.schoolId;
-    if (!schoolId) {
-        return res.status(400).json({ message: "School ID is missing from token" });
-    }
-
+    // 1. get school id from token or slug from query
+    const schoolIdFromToken = req.user.schoolId;
+    const schoolSlug = req.query.schoolSlug;
 
     // 2. Passing values to Service
-    const result = await getAllClassesService(schoolId);
+    const result = await getAllClassesService(schoolIdFromToken, schoolSlug);
 
     // 3. Handling service response
     if (result.status === "NOT_FOUND") {

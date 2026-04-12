@@ -34,11 +34,12 @@ exports.createSubjectController = asyncHandler(async (req, res) => {
  */
 
 exports.getAllSubjectsController = asyncHandler(async (req, res) => {
-    // 0. Get school ID from token
-    const schoolId = req.user.schoolId;
+    // 0. Get school ID from token or slug from query
+    const schoolIdFromToken = req.user.schoolId;
+    const schoolSlug = req.query.schoolSlug;
 
     // 1. get all subjects
-    const subjects = await getAllSubjectsService(schoolId);
+    const subjects = await getAllSubjectsService(schoolIdFromToken, schoolSlug);
     return res.status(200).json({ message: "Subjects retrieved successfully", subjects });
 });
 

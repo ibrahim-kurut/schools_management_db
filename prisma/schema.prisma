@@ -124,6 +124,7 @@ model User {
   // 4. Academic (Teacher)
   subjects Subject[] @relation("TeacherSubjects")
   notes    Note[]    @relation("TeacherNotes")
+  schedules Schedule[]
 
   // 5. Financial (Student)
   paymentsMade Payment[] @relation("StudentPayments")
@@ -172,6 +173,7 @@ model School {
 
   // Academic Structure
   classes Class[]
+  schedules Schedule[]
 
   // Financial Records
   payments Payment[]
@@ -287,6 +289,7 @@ model Class {
   students User[]    @relation("ClassStudents")
   subjects Subject[]
   notes    Note[]
+  schedules Schedule[]
 
   tuitionFee Float @default(0) // Fee for this class
 
@@ -317,6 +320,7 @@ model Subject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   grades    Grade[]
+  schedules Schedule[]
 
   @@index([classId])
   @@index([teacherId])
@@ -478,4 +482,45 @@ model StudentProfile {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// --------------------------------------
+// Schedule Module
+// --------------------------------------
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+model Schedule {
+  id        String   @id @default(uuid())
+  day       DayOfWeek
+  startTime String   // e.g. "08:00"
+  endTime   String   // e.g. "08:45"
+  
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  teacherId String
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([teacherId])
+  @@index([day])
 }

@@ -68,20 +68,40 @@ exports.createSubjectService = async (schoolId, reqData) => {
  * @access private (school owner, assistant)
  */
 
-exports.getAllSubjectsService = async (schoolId) => {
+exports.getAllSubjectsService = async (schoolId, schoolSlug = null) => {
     try {
+        let finalSchoolId = schoolId;
+
+        // If schoolId is not provided or if slug is provided for better context
+        if (schoolSlug) {
+            const schoolBySlug = await prisma.school.findUnique({
+                where: { slug: schoolSlug }
+            });
+            if (schoolBySlug) {
+                finalSchoolId = schoolBySlug.id;
+            }
+        }
+
+        if (!finalSchoolId) {
+            return []; // Return empty if no school found
+        }
+
         // 0. Check Redis Cache
-        const cacheKey = `school:${schoolId}:subjects`;
-        const cachedData = await redis.get(cacheKey);
-        if (cachedData) {
-            return JSON.parse(cachedData);
+        const cacheKey = `school:${finalSchoolId}:subjects`;
+        try {
+            const cachedData = await redis.get(cacheKey);
+            if (cachedData) {
+                return JSON.parse(cachedData);
+            }
+        } catch (redisError) {
+            console.error("Redis Error:", redisError);
         }
 
         // 1. get all subjects for this school by filtering through the Class relation
         const subjects = await prisma.subject.findMany({
             where: {
                 class: {
-                    schoolId: schoolId
+                    schoolId: finalSchoolId
                 },
                 isDeleted: false
             },
@@ -96,7 +116,11 @@ exports.getAllSubjectsService = async (schoolId) => {
         });
 
         // 2. Save to Redis Cache (1 hour)
-        await redis.set(cacheKey, JSON.stringify(subjects), 'EX', 3600);
+        try {
+            await redis.set(cacheKey, JSON.stringify(subjects), 'EX', 3600);
+        } catch (redisError) {
+            console.error("Redis Error:", redisError);
+        }
 
         return subjects;
     } catch (error) {
