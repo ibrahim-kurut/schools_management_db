@@ -193,17 +193,12 @@ exports.approveSubscriptionService = async (requestId, adminNotes) => {
         return { updatedRequest, subscription };
     });
 
-    // إرسال إشعار لمدير المدرسة
+    // إرسال إشعار لمدير المدرسة (مالك المدرسة)
     try {
-        const schoolAdmin = await prisma.user.findFirst({
-            where: { schoolId: request.schoolId, role: 'SCHOOL_ADMIN' },
-            select: { id: true }
-        });
-
-        if (schoolAdmin) {
+        if (request.school && request.school.ownerId) {
             await createNotificationService(
-                schoolAdmin.id,
-                "تمت الموافقة على اشتراكك",
+                request.school.ownerId,
+                "تمت الموافقة على اشتراكك 🎉",
                 `تمت الموافقة على طلب مدرسة "${request.school.name}" للاشتراك في باقة "${request.plan.name}". ${adminNotes ? `ملاحظات الإدارة: ${adminNotes}` : ''}`,
                 "SUBSCRIPTION_UPDATE"
             );
@@ -258,16 +253,11 @@ exports.rejectSubscriptionService = async (requestId, adminNotes) => {
         }
     });
 
-    // إرسال إشعار لمدير المدرسة
+    // إرسال إشعار لمدير المدرسة (مالك المدرسة)
     try {
-        const schoolAdmin = await prisma.user.findFirst({
-            where: { schoolId: updatedRequest.schoolId, role: 'SCHOOL_ADMIN' },
-            select: { id: true }
-        });
-
-        if (schoolAdmin) {
+        if (updatedRequest.school && updatedRequest.school.ownerId) {
             await createNotificationService(
-                schoolAdmin.id,
+                updatedRequest.school.ownerId,
                 "تم رفض طلب الاشتراك",
                 `نأسف لإبلاغك بأنه تم رفض طلب مدرسة "${updatedRequest.school.name}" للاشتراك في باقة "${updatedRequest.plan.name}". ملاحظات الإدارة: ${adminNotes}`,
                 "SUBSCRIPTION_UPDATE"
