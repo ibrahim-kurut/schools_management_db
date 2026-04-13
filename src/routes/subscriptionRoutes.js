@@ -6,6 +6,7 @@ const {
     rejectSubscriptionController,
     getPendingRequestsCountController,
     getMySubscriptionController,
+    getMyPendingRequestController,
     settleDebtController,
     updateSchoolSubscriptionController
 } = require("../controllers/subscriptionController");
@@ -17,6 +18,9 @@ router.get("/my-subscription", verifyToken, authorize("SCHOOL_ADMIN"), getMySubs
 
 // School Admin: Request subscription
 router.post("/request", verifyToken, authorize("SCHOOL_ADMIN"), createSubscriptionRequestController);
+
+// School Admin: Get my pending request
+router.get("/my-pending-request", verifyToken, authorize("SCHOOL_ADMIN"), getMyPendingRequestController);
 
 // Super Admin: Get pending requests count
 router.get("/requests/count", verifyToken, authorize("SUPER_ADMIN"), getPendingRequestsCountController);

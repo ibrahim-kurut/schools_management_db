@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const redis = require("../config/redis");
+const { createNotificationService } = require("./notificationService");
 
 
 /**
@@ -86,9 +87,45 @@ exports.createSchoolService = async (schoolData) => {
             },
         },
         include: {
-            subscription: true
+            subscription: {
+                include: {
+                    plan: true
+                }
+            }
         }
     });
+
+    // 4.5. If it's a paid plan, create a SubscriptionRequest so it appears for Super Admin
+    if (subscriptionStatus === "PENDING") {
+        try {
+            await prisma.subscriptionRequest.create({
+                data: {
+                    schoolId: newSchool.id,
+                    planId: planId,
+                    status: "PENDING"
+                }
+            });
+
+            // Notify Super Admins
+            const superAdmins = await prisma.user.findMany({
+                where: { role: 'SUPER_ADMIN' },
+                select: { id: true }
+            });
+
+            for (const admin of superAdmins) {
+                await createNotificationService(
+                    admin.id,
+                    "طلب اشتراك مدرسة جديدة",
+                    `قامت مدرسة "${newSchool.name}" بالتسجيل واختيار باقة "${newSchool.subscription.plan.name}". يرجى مراجعة الطلب وتفعيله.`,
+                    "SUBSCRIPTION_REQUEST"
+                );
+            }
+        } catch (requestErr) {
+            console.error("Failed to create subscription request or notify admins:", requestErr);
+            // We don't throw here to avoid failing school creation if notification/request record fails
+        }
+    }
+
     // 5. return school
     return newSchool;
 }

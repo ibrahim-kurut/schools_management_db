@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const redis = require("../config/redis");
+const { createNotificationService } = require("./notificationService");
 
 
 /**
@@ -39,7 +40,7 @@ exports.createSubscriptionRequestService = async (schoolId, planId, paymentRecei
         data: {
             schoolId,
             planId,
-            paymentReceipt,
+            // paymentReceipt, // تم إيقاف الاعتماد على إيصال الدفع
             status: "PENDING"
         },
         include: {
@@ -61,6 +62,25 @@ exports.createSubscriptionRequestService = async (schoolId, planId, paymentRecei
         redis.del('subscription-requests-REJECTED'),
         redis.del('subscription-requests-count')
     ]);
+
+    // إرسال إشعار للمدراء العامين (Super Admins)
+    try {
+        const superAdmins = await prisma.user.findMany({
+            where: { role: 'SUPER_ADMIN' },
+            select: { id: true }
+        });
+        
+        for (const admin of superAdmins) {
+            await createNotificationService(
+                admin.id,
+                "طلب اشتراك جديد",
+                `قامت مدرسة "${school.name}" بطلب الاشتراك في باقة "${plan.name}". يرجى مراجعة الطلب.`,
+                "SUBSCRIPTION_REQUEST"
+            );
+        }
+    } catch (err) {
+        console.error("Failed to send notification to Super Admins:", err);
+    }
 
     return newRequest;
 };
@@ -173,6 +193,25 @@ exports.approveSubscriptionService = async (requestId, adminNotes) => {
         return { updatedRequest, subscription };
     });
 
+    // إرسال إشعار لمدير المدرسة
+    try {
+        const schoolAdmin = await prisma.user.findFirst({
+            where: { schoolId: request.schoolId, role: 'SCHOOL_ADMIN' },
+            select: { id: true }
+        });
+
+        if (schoolAdmin) {
+            await createNotificationService(
+                schoolAdmin.id,
+                "تمت الموافقة على اشتراكك",
+                `تمت الموافقة على طلب مدرسة "${request.school.name}" للاشتراك في باقة "${request.plan.name}". ${adminNotes ? `ملاحظات الإدارة: ${adminNotes}` : ''}`,
+                "SUBSCRIPTION_UPDATE"
+            );
+        }
+    } catch (err) {
+        console.error("Failed to send notification to School Admin:", err);
+    }
+
     // 5. Invalidate cache
     await Promise.all([
         redis.del('subscription-requests-all'),
@@ -212,8 +251,31 @@ exports.rejectSubscriptionService = async (requestId, adminNotes) => {
         data: {
             status: "REJECTED",
             adminNotes
+        },
+        include: {
+            plan: true,
+            school: true
         }
     });
+
+    // إرسال إشعار لمدير المدرسة
+    try {
+        const schoolAdmin = await prisma.user.findFirst({
+            where: { schoolId: updatedRequest.schoolId, role: 'SCHOOL_ADMIN' },
+            select: { id: true }
+        });
+
+        if (schoolAdmin) {
+            await createNotificationService(
+                schoolAdmin.id,
+                "تم رفض طلب الاشتراك",
+                `نأسف لإبلاغك بأنه تم رفض طلب مدرسة "${updatedRequest.school.name}" للاشتراك في باقة "${updatedRequest.plan.name}". ملاحظات الإدارة: ${adminNotes}`,
+                "SUBSCRIPTION_UPDATE"
+            );
+        }
+    } catch (err) {
+        console.error("Failed to send notification to School Admin:", err);
+    }
 
     // 4. Invalidate cache
     await Promise.all([
@@ -362,3 +424,20 @@ exports.updateSubscriptionBySuperAdminService = async (schoolId, data) => {
 
     return updatedSubscription;
 };
+
+/**
+ * @description Get pending subscription request for a specific school
+ * @param {string} schoolId 
+ */
+exports.getMyPendingRequestService = async (schoolId) => {
+    return await prisma.subscriptionRequest.findFirst({
+        where: {
+            schoolId,
+            status: "PENDING"
+        },
+        include: {
+            plan: true
+        }
+    });
+};
+

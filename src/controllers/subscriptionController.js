@@ -5,6 +5,7 @@ const {
     rejectSubscriptionService,
     getPendingRequestsCountService,
     getMySubscriptionService,
+    getMyPendingRequestService,
     settleDebtService,
     updateSubscriptionBySuperAdminService
 } = require("../services/subscriptionService");
@@ -163,6 +164,29 @@ exports.getMySubscriptionController = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         data: subscription
+    });
+});
+
+/**
+ * @description Get my pending subscription request
+ * @route GET /api/subscriptions/my-pending-request
+ * @access private (School Admin only)
+ */
+exports.getMyPendingRequestController = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+
+    if (!schoolId) {
+        return res.status(403).json({
+            success: false,
+            message: "You must be a school admin"
+        });
+    }
+
+    const request = await getMyPendingRequestService(schoolId);
+
+    res.status(200).json({
+        success: true,
+        data: request
     });
 });
 

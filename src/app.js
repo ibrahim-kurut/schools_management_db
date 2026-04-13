@@ -28,6 +28,7 @@ app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/archive', require('./routes/archiveRoutes'));
 app.use('/api/schedules', require('./routes/scheduleRoutes'));
 app.use('/api/admin/plans', require('./routes/admin.plans.routes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // Error Handler Middleware (Must be last)
 app.use(require('./middleware/errorHandler'));
