@@ -5,7 +5,8 @@ const {
     approveSubscriptionController,
     rejectSubscriptionController,
     getPendingRequestsCountController,
-    getMySubscriptionController
+    getMySubscriptionController,
+    settleDebtController
 } = require("../controllers/subscriptionController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 const router = express.Router();
@@ -27,5 +28,8 @@ router.post("/approve/:id", verifyToken, authorize("SUPER_ADMIN"), approveSubscr
 
 // Super Admin: Reject subscription request
 router.post("/reject/:id", verifyToken, authorize("SUPER_ADMIN"), rejectSubscriptionController);
+
+// Super Admin: Settle debt for a school
+router.post("/settle-debt/:schoolId", verifyToken, authorize("SUPER_ADMIN"), settleDebtController);
 
 module.exports = router;

@@ -4,7 +4,8 @@ const {
     approveSubscriptionService,
     rejectSubscriptionService,
     getPendingRequestsCountService,
-    getMySubscriptionService
+    getMySubscriptionService,
+    settleDebtService
 } = require("../services/subscriptionService");
 const {
     createSubscriptionRequestSchema,
@@ -161,5 +162,29 @@ exports.getMySubscriptionController = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         data: subscription
+    });
+});
+
+/**
+ * @description Settle debt for a specific school (Super Admin)
+ * @route POST /api/subscriptions/settle-debt/:schoolId
+ * @access private (Super Admin only)
+ */
+exports.settleDebtController = asyncHandler(async (req, res) => {
+    const { schoolId } = req.params;
+
+    if (!schoolId) {
+        return res.status(400).json({
+            success: false,
+            message: "School ID is required"
+        });
+    }
+
+    const updatedSubscription = await settleDebtService(schoolId);
+
+    res.status(200).json({
+        success: true,
+        message: "تمت تسوية الديون بنجاح",
+        data: updatedSubscription
     });
 });
