@@ -3,7 +3,8 @@ const {
     getSubscriptionRequestsService,
     approveSubscriptionService,
     rejectSubscriptionService,
-    getPendingRequestsCountService
+    getPendingRequestsCountService,
+    getMySubscriptionService
 } = require("../services/subscriptionService");
 const {
     createSubscriptionRequestSchema,
@@ -130,5 +131,35 @@ exports.getPendingRequestsCountController = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         data: { count }
+    });
+});
+
+/**
+ * @description Get subscription info for the logged-in school admin
+ * @route GET /api/subscriptions/my-subscription
+ * @access private (School Admin only)
+ */
+exports.getMySubscriptionController = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+
+    if (!schoolId) {
+        return res.status(403).json({
+            success: false,
+            message: "You must be a school admin to view subscription details"
+        });
+    }
+
+    const subscription = await getMySubscriptionService(schoolId);
+
+    if (!subscription) {
+        return res.status(404).json({
+            success: false,
+            message: "No active subscription found for this school"
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        data: subscription
     });
 });

@@ -70,15 +70,8 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
         }
     }
 
-    // 4. Check Plan Limits
-    if (memberRole === "STUDENT") {
-        const currentStudentsCount = await prisma.user.count({
-            where: { schoolId: school.id, role: "STUDENT" }
-        });
-        if (currentStudentsCount >= school.subscription.plan.maxStudents) {
-            throw new Error("Plan limit reached for Students. Upgrade your plan.");
-        }
-    } else if (memberRole === "TEACHER" || memberRole === "ASSISTANT" || memberRole === "ACCOUNTANT") {
+    // 4. Check Plan Limits (Teachers and Assistants only, students are now debt-based)
+    if (memberRole === "TEACHER" || memberRole === "ASSISTANT" || memberRole === "ACCOUNTANT") {
         const currentTeachersCount = await prisma.user.count({
             where: { schoolId: school.id, role: { in: ["TEACHER", "ASSISTANT", "ACCOUNTANT"] } }
         });
@@ -747,20 +740,7 @@ exports.bulkImportStudentsService = async (requesterId, requesterRole, classId, 
         throw new Error("الصف الدراسي المحدد غير موجود في هذه المدرسة.");
     }
 
-    // 4. التحقق من حدود الخطة (عدد الطلاب المسموح)
-    const currentStudentsCount = await prisma.user.count({
-        where: { schoolId: school.id, role: "STUDENT", isDeleted: false }
-    });
-
-    const maxAllowed = school.subscription.plan.maxStudents;
-    const remainingSlots = maxAllowed - currentStudentsCount;
-
-    if (students.length > remainingSlots) {
-        throw new Error(
-            `تجاوز الحد المسموح به. لديك ${remainingSlots} مقعد متبقي من أصل ${maxAllowed}، ` +
-            `لكنك تحاول إضافة ${students.length} طالب.`
-        );
-    }
+    // 4. تمت إزالة المنع بخصوص حدود الخطة بالنسبة للطلاب، سيتم احتساب الديون لاحقاً بدلاً من الرفض.
 
     // 5. جلب آخر studentCode في المدرسة لتوليد الأكواد التلقائية
     const lastStudent = await prisma.user.findFirst({

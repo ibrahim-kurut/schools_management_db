@@ -199,27 +199,42 @@ model Plan {
   name                 String                @unique
   description          String?
   price                Float                 @default(0)
-  maxStudents          Int                   @default(50)
+  maxStudents          Int                   @default(15)
+  bufferStudents       Int                   @default(10)
+  pricePerExtraStudent Float                 @default(9)
+  
+  hasBasicManagement   Boolean               @default(true)
+  hasAttendance        Boolean               @default(true)
+  hasSchedules         Boolean               @default(false)
+  hasExcelUpload       Boolean               @default(false)
+  hasFinancials        Boolean               @default(false)
+  hasBusSystem         Boolean               @default(false)
+  hasMobileApp         Boolean               @default(false)
+  hasAiReports         Boolean               @default(false)
+  
+  supportLevel         String                @default("EMAIL")
+  
   maxTeachers          Int                   @default(10)
   allowReports         Boolean               @default(false)
   storageLimit         Int                   @default(100)
-  durationInDays       Int                   @default(30)
+  durationInDays       Int                   @default(365)
   subscriptions        Subscription[]
   createdAt            DateTime              @default(now())
   subscriptionRequests SubscriptionRequest[]
 }
 
 model Subscription {
-  id        String   @id @default(uuid())
-  schoolId  String   @unique
-  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  planId    String
-  plan      Plan     @relation(fields: [planId], references: [id])
-  startDate DateTime @default(now())
-  endDate   DateTime
-  status    Status   @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  schoolId    String   @unique
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        Plan     @relation(fields: [planId], references: [id])
+  startDate   DateTime @default(now())
+  endDate     DateTime
+  status      Status   @default(PENDING)
+  currentDebt Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // --------------------------------------

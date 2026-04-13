@@ -4,10 +4,14 @@ const {
     getSubscriptionRequestsController,
     approveSubscriptionController,
     rejectSubscriptionController,
-    getPendingRequestsCountController
+    getPendingRequestsCountController,
+    getMySubscriptionController
 } = require("../controllers/subscriptionController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 const router = express.Router();
+
+// School Admin: Get own subscription
+router.get("/my-subscription", verifyToken, authorize("SCHOOL_ADMIN"), getMySubscriptionController);
 
 // School Admin: Request subscription
 router.post("/request", verifyToken, authorize("SCHOOL_ADMIN"), createSubscriptionRequestController);

@@ -250,3 +250,41 @@ exports.getPendingRequestsCountService = async () => {
 
     return count;
 };
+
+/**
+ * @description Get subscription of a specific school (School Admin)
+ * @param {string} schoolId 
+ * @returns {Promise<Object>} Subscription details with plan and usage
+ */
+exports.getMySubscriptionService = async (schoolId) => {
+    // 1. Fetch subscription with plan
+    const subscription = await prisma.subscription.findUnique({
+        where: { schoolId },
+        include: {
+            plan: true
+        }
+    });
+
+    if (!subscription) {
+        return null;
+    }
+
+    // 2. Fetch current student count
+    const studentCount = await prisma.user.count({
+        where: {
+            schoolId,
+            role: "STUDENT",
+            isDeleted: false
+        }
+    });
+
+    return {
+        ...subscription,
+        usage: {
+            studentCount,
+            maxStudents: subscription.plan.maxStudents,
+            bufferStudents: subscription.plan.bufferStudents,
+            totalLimit: subscription.plan.maxStudents + subscription.plan.bufferStudents
+        }
+    };
+};

@@ -49,9 +49,24 @@ exports.addMemberController = asyncHandler(async (req, res) => {
         };
     }
 
-    // 3. Response
+    // 4. Update Debt and get pricing info if it's a student
+    let pricingMessage = "";
+    if (newUser.role === "STUDENT") {
+        const PricingService = require('../services/pricing.service');
+        const pricingResult = await PricingService.updateSchoolDebt(req.user.schoolId || req.user.id);
+        
+        if (pricingResult) {
+            if (pricingResult.hasExceededLimit && !pricingResult.warning) {
+                pricingMessage = " التنبيه: لقد تجاوزت سعة الهدية المتاحة. سيتم احتساب التكلفة الزائدة كديون إضافية على الخطّة.";
+            } else if (pricingResult.isInBufferZone && !pricingResult.warning) {
+                pricingMessage = " ملاحظة: أنت الآن تستخدم سعة الهدية المجانية المتاحة لك.";
+            }
+        }
+    }
+
+    // 5. Response
     res.status(201).json({
-        message: "Member added successfully",
+        message: "Member added successfully." + pricingMessage,
         user: responseUser
     });
 });
@@ -271,11 +286,25 @@ exports.bulkImportStudentsController = asyncHandler(async (req, res) => {
         students
     );
 
-    // 6. الاستجابة بالنتيجة
+    // 6. تحديث ديون المدرسة وجلب التنبيه إن وجد
+    const PricingService = require('../services/pricing.service');
+    const pricingResult = await PricingService.updateSchoolDebt(req.user.schoolId || req.user.id);
+    
+    let pricingMessage = "";
+    if (pricingResult) {
+        if (pricingResult.hasExceededLimit && !pricingResult.warning) {
+            pricingMessage = " التنبيه: لقد تجاوزت السعة المسموحة. سيتم احتساب التكلفة لعدد الطلاب الإضافيين كديون آلياً بناءً على خطتك.";
+        } else if (pricingResult.isInBufferZone && !pricingResult.warning) {
+             pricingMessage = " ملاحظة: تم استهلاك من سعة الهدية المجانية المتاحة لك ضمن الاشتراك.";
+        }
+    }
+
+    // 7. الاستجابة بالنتيجة والتنبيه
     res.status(201).json({
-        message: `تم استيراد ${result.importedCount} طالب بنجاح إلى الصف "${result.className}".`,
+        message: `تم استيراد ${result.importedCount} طالب بنجاح إلى الصف "${result.className}".${pricingMessage}`,
         importedCount: result.importedCount,
         className: result.className,
+        pricingUpdate: pricingResult
     });
 });
 

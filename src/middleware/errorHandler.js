@@ -17,7 +17,7 @@ const errorHandler = (err, req, res, next) => {
     res.status(statusCode).json({
         status: "ERROR",
         message: isProd
-            ? "Internal server error. Please try again later."
+            ? "حدث خطأ داخلي في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
             : err.message,
         ...(isProd ? {} : { stack: err.stack })
     });
