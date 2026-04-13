@@ -104,46 +104,66 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
     const skip = (page - 1) * limit;
 
     // 2. Fetching data with total count
-    const [schools, totleSchools] = await Promise.all([
+    const [schools, totalSchools] = await Promise.all([
         prisma.school.findMany({
-            where: searchWord ? {
-                name: {
-                    contains: searchWord,
-                    mode: 'insensitive',
-                }
-            } : {},
+            where: {
+                isDeleted: false,
+                ...(searchWord ? {
+                    name: {
+                        contains: searchWord,
+                        mode: 'insensitive',
+                    }
+                } : {})
+            },
             skip: skip,
             take: limit,
             include: {
+                owner: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true
+                    }
+                },
                 subscription: {
                     include: {
                         plan: true,
                     },
                 },
+                _count: {
+                    select: {
+                        members: {
+                            where: { role: 'STUDENT', isDeleted: false }
+                        }
+                    }
+                }
             },
             orderBy: {
-                createdAt: 'desc' // Sorting from latest to oldest
+                createdAt: 'desc'
             }
         }),
         prisma.school.count({
-            where: searchWord ? {
-                name: {
-                    contains: searchWord,
-                    mode: 'insensitive',
-                }
-            } : {},
-        }) // Total count of schools
+            where: {
+                isDeleted: false,
+                ...(searchWord ? {
+                    name: {
+                        contains: searchWord,
+                        mode: 'insensitive',
+                    }
+                } : {})
+            },
+        })
     ]);
 
     // 3. Calculating total pages
-    const totalPages = Math.ceil(totleSchools / limit);
+    const totalPages = Math.ceil(totalSchools / limit);
 
     // 4. Returning data with pagination info
     return {
         schools,
         currentPage: page,
         totalPages,
-        totleSchools,
+        totleSchools: totalSchools, // Keeping the original key name to avoid breaking frontend/controller
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1
     };
@@ -270,10 +290,14 @@ exports.deleteSchoolByIdService = async (id, userId, userRole) => {
         throw new Error("FORBIDDEN");
     }
 
-    // 4. Deleting school
-    const deletedSchool = await prisma.school.delete({
+    // 4. Soft deleting school (Archive)
+    const deletedSchool = await prisma.school.update({
         where: {
             id: id
+        },
+        data: {
+            isDeleted: true,
+            deletedAt: new Date()
         }
     });
 

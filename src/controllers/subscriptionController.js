@@ -5,7 +5,8 @@ const {
     rejectSubscriptionService,
     getPendingRequestsCountService,
     getMySubscriptionService,
-    settleDebtService
+    settleDebtService,
+    updateSubscriptionBySuperAdminService
 } = require("../services/subscriptionService");
 const {
     createSubscriptionRequestSchema,
@@ -185,6 +186,31 @@ exports.settleDebtController = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         message: "تمت تسوية الديون بنجاح",
+        data: updatedSubscription
+    });
+});
+
+/**
+ * @description Update subscription info by Super Admin
+ * @route PUT /api/subscriptions/update-school/:schoolId
+ * @access private (Super Admin only)
+ */
+exports.updateSchoolSubscriptionController = asyncHandler(async (req, res) => {
+    const { schoolId } = req.params;
+    const { planId, status, endDate } = req.body;
+
+    if (!schoolId) {
+        return res.status(400).json({
+            success: false,
+            message: "School ID is required"
+        });
+    }
+
+    const updatedSubscription = await updateSubscriptionBySuperAdminService(schoolId, { planId, status, endDate });
+
+    res.status(200).json({
+        success: true,
+        message: "تم تحديث اشتراك المدرسة بنجاح",
         data: updatedSubscription
     });
 });

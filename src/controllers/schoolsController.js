@@ -86,14 +86,9 @@ exports.getAllSchools = asyncHandler(async (req, res) => {
     // 2. Passing values to Service
     const result = await getAllSchoolsService(page, limit, searchWord);
 
-    // 3. Checking if schools exist
-    if (!result.schools || result.schools.length === 0) {
-        return res.status(404).json({ message: "No schools found" });
-    }
-
-    // 4. Sending data with pagination info
+    // 3. Passing data with pagination info
     res.status(200).json({
-        message: "Schools retrieved successfully",
+        message: result.schools.length === 0 ? "No schools yet" : "Schools retrieved successfully",
         schools: result.schools,
         pagination: {
             currentPage: result.currentPage,

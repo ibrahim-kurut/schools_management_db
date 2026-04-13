@@ -317,3 +317,48 @@ exports.settleDebtService = async (schoolId) => {
 
     return updatedSubscription;
 };
+
+/**
+ * @description Update subscription plan and status by Super Admin
+ * @param {string} schoolId 
+ * @param {Object} data { planId, status, endDate }
+ * @returns {Promise<Object>} Updated subscription
+ */
+exports.updateSubscriptionBySuperAdminService = async (schoolId, data) => {
+    // 1. Validate planId exists and is not empty
+    if (!data.planId) {
+        throw new Error("يجب اختيار باقة اشتراك للمدرسة");
+    }
+
+    // 2. Verify Plan exists before attempting to connect
+    const planExists = await prisma.plan.findUnique({
+        where: { id: data.planId }
+    });
+    if (!planExists) {
+        throw new Error("باقة الاشتراك المختارة غير موجودة");
+    }
+
+    // 3. Upsert subscription (Update if exists, Create if not)
+    const updatedSubscription = await prisma.subscription.upsert({
+        where: { schoolId },
+        update: {
+            planId: data.planId,
+            status: data.status,
+            endDate: data.endDate ? new Date(data.endDate) : undefined
+        },
+        create: {
+            school: { connect: { id: schoolId } },
+            plan: { connect: { id: data.planId } },
+            status: data.status || "PENDING",
+            endDate: data.endDate ? new Date(data.endDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        },
+        include: {
+            plan: true
+        }
+    });
+
+    // 4. Invalidate cache
+    await redis.del(`school:${schoolId}`);
+
+    return updatedSubscription;
+};
