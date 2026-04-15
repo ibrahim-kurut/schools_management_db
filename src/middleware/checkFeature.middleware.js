@@ -14,10 +14,21 @@ const requireFeature = (featureName) => {
         return next();
       }
 
-      const schoolId = req.user?.schoolId || req.body.schoolId || req.query.schoolId || req.params.schoolId;
+      let schoolId = req.user?.schoolId || req.body.schoolId || req.query.schoolId || req.params.schoolId;
+
+      // If SCHOOL_ADMIN and no schoolId in token, they might be the owner
+      if (!schoolId && req.user && req.user.role === 'SCHOOL_ADMIN') {
+        const ownedSchool = await prisma.school.findUnique({
+          where: { ownerId: req.user.id },
+          select: { id: true }
+        });
+        if (ownedSchool) {
+          schoolId = ownedSchool.id;
+        }
+      }
 
       if (!schoolId) {
-         return res.status(400).json({ error: "تعذر التحقق من خطة المدرسة لعدم وجود معرّف المدرسة (School ID)." });
+         return res.status(400).json({ message: "تعذر التحقق من خطة المدرسة لعدم وجود معرّف المدرسة (School ID)." });
       }
 
       const subscription = await prisma.subscription.findUnique({
@@ -27,7 +38,7 @@ const requireFeature = (featureName) => {
 
       if (!subscription || !subscription.plan[featureName]) {
         return res.status(403).json({
-          error: "عذراً، هذه الميزة غير متاحة في خطتك الحالية. يرجى مراجعة إدارة المنصة لترقية الاشتراك."
+          message: "عذراً، هذه الميزة غير متاحة في خطتك الحالية. يرجى مراجعة إدارة المنصة لترقية الاشتراك."
         });
       }
       

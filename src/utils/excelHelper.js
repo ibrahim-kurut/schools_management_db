@@ -105,9 +105,9 @@ const sanitizeAndValidateRows = (rawRows) => {
             return;
         }
 
-        // التحقق من أن الرقم يتكون من 10 أرقام بالضبط
-        if (parentPhone.length !== 10) {
-            errors.push(`الصف ${rowNum}: رقم هاتف ولي الأمر (${parentPhone}) يجب أن يتكون من 10 أرقام بالضبط. الرقم الحالي يتكون من ${parentPhone.length} رقماً.`);
+        // التحقق من أن الرقم يتكون من 10 أو 11 رقماً
+        if (parentPhone.length !== 10 && parentPhone.length !== 11) {
+            errors.push(`الصف ${rowNum}: رقم هاتف ولي الأمر (${parentPhone}) يجب أن يتكون من 10 أو 11 رقماً. الرقم الحالي يتكون من ${parentPhone.length} رقماً.`);
             return;
         }
 
