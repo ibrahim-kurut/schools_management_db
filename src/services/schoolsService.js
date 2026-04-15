@@ -344,3 +344,28 @@ exports.deleteSchoolByIdService = async (id, userId, userRole) => {
     // 6. Returning deleted school
     return deletedSchool;
 }
+
+/**
+ * @description Get school stats overview
+ * @route GET /api/schools/stats/overview
+ * @method GET
+ * @access private
+ */
+exports.getSchoolStatsOverviewService = async (schoolId) => {
+    const [totalStudents, totalStaff, totalClasses, totalRevenueResult] = await Promise.all([
+        prisma.user.count({ where: { schoolId, role: 'STUDENT', isDeleted: false } }),
+        prisma.user.count({ where: { schoolId, role: { in: ['TEACHER', 'ASSISTANT', 'ACCOUNTANT', 'SCHOOL_ADMIN'] }, isDeleted: false } }),
+        prisma.class.count({ where: { schoolId, isDeleted: false } }),
+        prisma.payment.aggregate({
+            where: { schoolId, status: 'COMPLETED' },
+            _sum: { amount: true }
+        })
+    ]);
+
+    return {
+        totalStudents: totalStudents || 0,
+        totalStaff: totalStaff || 0,
+        totalClasses: totalClasses || 0,
+        totalRevenue: totalRevenueResult._sum.amount || 0
+    };
+}

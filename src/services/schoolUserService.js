@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/auth");
+const redis = require("../config/redis");
 const supabase = require("../config/supabaseClient");
 const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
 
@@ -199,6 +200,9 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
         }
     }
 
+
+    // 8. Invalidate Classes Cache
+    await redis.del(`school:${school.id}:classes`);
 
     // Return user without sensitive data
     const { password, ...userWithoutPassword } = newUser;
@@ -587,6 +591,9 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
         }
     });
 
+    // 8. Invalidate Classes Cache
+    await redis.del(`school:${school.id}:classes`);
+
     return updatedMember;
 }
 
@@ -637,6 +644,9 @@ exports.deleteMemberByIdService = async (ownerId, memberId) => {
             isDeleted: true
         }
     });
+
+    // 4. Invalidate Classes Cache
+    await redis.del(`school:${school.id}:classes`);
 
     return deletedMember;
 }
@@ -858,6 +868,9 @@ exports.bulkImportStudentsService = async (requesterId, requesterRole, classId, 
             skipDuplicates: true,
         });
     }
+
+    // 10. Invalidate Classes Cache
+    await redis.del(`school:${school.id}:classes`);
 
     return {
         importedCount: result.count,

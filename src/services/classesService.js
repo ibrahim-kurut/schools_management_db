@@ -39,7 +39,21 @@ exports.createClassService = async (schoolId, classData) => {
                 tuitionFee: classData.tuitionFee || 0,
                 schoolId: schoolId,
             },
+            include: {
+                _count: {
+                    select: {
+                        students: {
+                            where: { isDeleted: false, role: 'STUDENT' }
+                        }
+                    }
+                }
+            }
         });
+
+        const mappedClass = {
+            ...newClass,
+            studentsCount: newClass._count.students
+        };
 
         // 5. Invalidate List Cache
         await redis.del(`school:${schoolId}:classes`);
@@ -48,7 +62,7 @@ exports.createClassService = async (schoolId, classData) => {
         return {
             status: "SUCCESS",
             message: "تم إنشاء الصف بنجاح.",
-            class: newClass
+            class: mappedClass
         };
 
     } catch (error) {
@@ -108,32 +122,37 @@ exports.getAllClassesService = async (schoolId, schoolSlug = null) => {
             console.error("Redis Error:", redisError);
         }
 
-        // 3. get all classes
+        // 3. get all classes with student count
         const classes = await prisma.class.findMany({
             where: {
                 schoolId: finalSchoolId,
                 isDeleted: false
             },
-            select: {
-                id: true,
-                name: true,
-                tuitionFee: true,
+            include: {
                 _count: {
                     select: {
-                        students: true
+                        students: {
+                            where: { isDeleted: false, role: 'STUDENT' }
+                        }
                     }
                 }
             }
         });
 
-        // 4. return the classes
+        // Map classes to include studentsCount for the frontend
+        const mappedClasses = classes.map(cls => ({
+            ...cls,
+            studentsCount: cls._count?.students || 0
+        }));
+
+        // 5. return the classes
         const result = {
             status: "SUCCESS",
             message: "تم جلب الصفوف بنجاح.",
-            classes: classes
+            classes: mappedClasses
         };
 
-        // 5. Save to Redis Cache (1 hour)
+        // 6. Save to Redis Cache (1 hour)
         try {
             await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
         } catch (redisError) {
@@ -224,7 +243,7 @@ exports.getClassByIdService = async (schoolId, classId) => {
             },
             include: {
                 students: {
-                    where: { role: "STUDENT" },
+                    where: { role: "STUDENT", isDeleted: false },
                     select: {
                         id: true,
                         firstName: true,
@@ -235,17 +254,30 @@ exports.getClassByIdService = async (schoolId, classId) => {
                         birthDate: true,
                         createdAt: true
                     }
+                },
+                _count: {
+                    select: {
+                        students: {
+                            where: { isDeleted: false, role: 'STUDENT' }
+                        }
+                    }
                 }
             }
         });
         if (!classExists) {
             return { status: "NOT_FOUND", message: "الصف غير موجود." };
         }
+
+        const classData = {
+            ...classExists,
+            studentsCount: classExists._count.students
+        };
+
         // 3. return the class
         const result = {
             status: "SUCCESS",
             message: "Class fetched successfully",
-            class: classExists
+            class: classData
         };
 
         // 4. Save to Redis Cache (1 hour)
@@ -302,12 +334,27 @@ exports.updateClassService = async (schoolId, classId, classData) => {
                 name: classData.name,
                 tuitionFee: classData.tuitionFee,
             },
+            include: {
+                _count: {
+                    select: {
+                        students: {
+                            where: { isDeleted: false, role: 'STUDENT' }
+                        }
+                    }
+                }
+            }
         });
+
+        const mappedClass = {
+            ...updatedClass,
+            studentsCount: updatedClass._count.students
+        };
+
         // 4. return the class
         const result = {
             status: "SUCCESS",
             message: "تم تحديث الصف بنجاح.",
-            class: updatedClass
+            class: mappedClass
         };
 
         // 5. Invalidate Caches (List + Item)

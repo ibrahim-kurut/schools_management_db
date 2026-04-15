@@ -1,4 +1,4 @@
-const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateSchoolByIdService, deleteSchoolByIdService } = require("../services/schoolsService");
+const { createSchoolService, getAllSchoolsService, getSchoolByIdService, updateSchoolByIdService, deleteSchoolByIdService, getSchoolStatsOverviewService } = require("../services/schoolsService");
 const { createSchoolSchema, updateSchoolSchema } = require("../utils/schoolValidate");
 const { validateId } = require("../utils/validateUUID");
 const asyncHandler = require("../utils/asyncHandler");
@@ -208,3 +208,21 @@ exports.deleteSchoolById = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "School deleted successfully", school });
 });
 
+/**
+ * @description Get school stats overview
+ * @route GET /api/schools/stats/overview
+ * @method GET
+ * @access private
+ */
+exports.getSchoolStatsOverview = asyncHandler(async (req, res) => {
+    const schoolId = req.user.schoolId;
+    if (!schoolId) {
+        return res.status(400).json({ message: "School ID not found in token" });
+    }
+
+    const stats = await getSchoolStatsOverviewService(schoolId);
+    res.status(200).json({
+        message: "Stats retrieved successfully",
+        stats
+    });
+});
