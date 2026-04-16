@@ -327,15 +327,30 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
  * @access private (school owner)
  */
 
-exports.getMemberByIdService = async (ownerId, memberId) => {
-    // 1. Get School for the Requester (Owner)
-    const school = await prisma.school.findUnique({
-        where: { ownerId: ownerId },
+exports.getMemberByIdService = async (requesterId, memberId, requesterRole) => {
+    // 1. Get School Basic Info based on roles
+    let school;
+    if (requesterRole === 'SCHOOL_ADMIN' || requesterRole === 'SUPER_ADMIN') {
+        school = await prisma.school.findUnique({
+        where: { ownerId: requesterId },
         select: { id: true }
-    });
+        });
+    } else {
+        // For staff, get school via their schoolId
+        const requester = await prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { schoolId: true }
+        });
+        if (requester?.schoolId) {
+            school = await prisma.school.findUnique({
+                where: { id: requester.schoolId },
+                select: { id: true }
+            });
+        }
+    }
 
     if (!school) {
-        throw new Error("School not found for this user");
+        throw new Error("المدرسة غير موجودة أو انتهت صلاحية الجلسة");
     }
 
     // 2. Get Member by ID

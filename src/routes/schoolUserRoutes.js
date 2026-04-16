@@ -15,8 +15,8 @@ router.post('/import-students', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTA
 router.get('/import-template', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT']), requireFeature('hasExcelUpload'), downloadTemplateController);
 
 router.post('/', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT']), upload.single('image'), addMemberController);
-router.get('/', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT']), getAllMembersController);
-router.get('/:id', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT']), getMemberByIdController);
+router.get('/', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT', 'ACCOUNTANT']), getAllMembersController);
+router.get('/:id', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT', 'ACCOUNTANT']), getMemberByIdController);
 router.put('/:id', verifyToken, authorize(['SCHOOL_ADMIN', 'ASSISTANT']), upload.single('image'), updateMemberByIdController);
 router.delete('/:id', verifyToken, authorize(['SCHOOL_ADMIN']), deleteMemberByIdController);
 module.exports = router

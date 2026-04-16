@@ -147,7 +147,7 @@ exports.getMemberByIdController = asyncHandler(async (req, res) => {
     const ownerId = req.user.id;
 
     // 3. Call Service (Pass Owner ID + Member ID)
-    const member = await getMemberByIdService(ownerId, memberId);
+    const member = await getMemberByIdService(ownerId, memberId, req.user.role);
 
     // 4. Response
     res.status(200).json({
