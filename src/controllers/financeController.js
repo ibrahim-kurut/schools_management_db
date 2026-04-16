@@ -2,7 +2,8 @@ const asyncHandler = require("../utils/asyncHandler");
 const {
     getFinanceStatsService,
     getMonthlyFinanceReportService,
-    exportMonthlyFinanceReportService
+    exportMonthlyFinanceReportService,
+    getFinanceDashboardDetailsService
 } = require("../services/financeService");
 
 /**
@@ -64,4 +65,22 @@ exports.exportMonthlyFinanceReportController = asyncHandler(async (req, res) => 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     return res.status(200).send(buffer);
+});
+
+/**
+ * @description Get finance dashboard chart and latest operations
+ * @route GET /api/finance/dashboard/:schoolId
+ * @method GET
+ * @access private (Accountant, School Admin, Super Admin)
+ */
+exports.getFinanceDashboardDetailsController = asyncHandler(async (req, res) => {
+    const { schoolId } = req.params;
+    const { months } = req.query;
+    const result = await getFinanceDashboardDetailsService(req.user, schoolId, months);
+
+    return res.status(200).json({
+        status: "SUCCESS",
+        message: "Finance dashboard details retrieved successfully",
+        data: result
+    });
 });

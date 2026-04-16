@@ -4,7 +4,8 @@ const router = express.Router();
 const {
     getFinanceStatsController,
     getMonthlyFinanceReportController,
-    exportMonthlyFinanceReportController
+    exportMonthlyFinanceReportController,
+    getFinanceDashboardDetailsController
 } = require("../controllers/financeController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 const requireFeature = require("../middleware/checkFeature.middleware");
@@ -15,6 +16,14 @@ router.get(
     authorize(["ACCOUNTANT", "SCHOOL_ADMIN", "SUPER_ADMIN"]),
     requireFeature("hasFinancials"),
     getFinanceStatsController
+);
+
+router.get(
+    "/dashboard/:schoolId",
+    verifyToken,
+    authorize(["ACCOUNTANT", "SCHOOL_ADMIN", "SUPER_ADMIN"]),
+    requireFeature("hasFinancials"),
+    getFinanceDashboardDetailsController
 );
 
 router.get(

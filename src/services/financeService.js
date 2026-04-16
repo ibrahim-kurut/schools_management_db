@@ -50,6 +50,19 @@ const getMonthRange = (month) => {
     return { selectedMonth, startDate, endDate };
 };
 
+const getRecentMonths = (count) => {
+    const now = new Date();
+    const months = [];
+    for (let i = count - 1; i >= 0; i -= 1) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+            key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+            label: d.toLocaleString("ar", { month: "long" })
+        });
+    }
+    return months;
+};
+
 exports.getFinanceStatsService = async (requester, schoolId) => {
     const school = await assertSchoolAccess(requester, schoolId);
 
@@ -258,4 +271,57 @@ exports.exportMonthlyFinanceReportService = async (requester, schoolId, month) =
         buffer: XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }),
         report
     };
+};
+
+exports.getFinanceDashboardDetailsService = async (requester, schoolId, months = 6) => {
+    await assertSchoolAccess(requester, schoolId);
+    const normalizedMonths = Math.min(Math.max(parseInt(months, 10) || 6, 1), 12);
+    const monthRefs = getRecentMonths(normalizedMonths);
+
+    const [payments, expenses] = await Promise.all([
+        prisma.payment.findMany({
+            where: { schoolId },
+            select: { amount: true, date: true, student: { select: { firstName: true, lastName: true } } },
+            orderBy: { date: "desc" }
+        }),
+        prisma.expense.findMany({
+            where: { schoolId, isDeleted: false },
+            select: { amount: true, date: true, title: true },
+            orderBy: { date: "desc" }
+        })
+    ]);
+
+    const chartData = monthRefs.map((m) => ({ month: m.label, income: 0, expense: 0, key: m.key }));
+    const chartMap = new Map(chartData.map((item) => [item.key, item]));
+
+    payments.forEach((p) => {
+        const key = `${p.date.getFullYear()}-${String(p.date.getMonth() + 1).padStart(2, "0")}`;
+        const row = chartMap.get(key);
+        if (row) row.income += toNumber(p.amount);
+    });
+
+    expenses.forEach((e) => {
+        const key = `${e.date.getFullYear()}-${String(e.date.getMonth() + 1).padStart(2, "0")}`;
+        const row = chartMap.get(key);
+        if (row) row.expense += toNumber(e.amount);
+    });
+
+    const recentOperations = [
+        ...payments.slice(0, 10).map((payment) => ({
+            type: "PAYMENT",
+            title: payment.student ? `دفعة رسوم - ${payment.student.firstName} ${payment.student.lastName}` : "دفعة رسوم طالب",
+            amount: toNumber(payment.amount),
+            date: payment.date
+        })),
+        ...expenses.slice(0, 10).map((expense) => ({
+            type: "EXPENSE",
+            title: expense.title || "مصروف",
+            amount: toNumber(expense.amount),
+            date: expense.date
+        }))
+    ]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 10);
+
+    return { chartData, recentOperations };
 };
