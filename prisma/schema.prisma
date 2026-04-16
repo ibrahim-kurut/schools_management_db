@@ -181,6 +181,7 @@ model School {
   // Financial Records
   payments Payment[]
   expenses Expense[]
+  feeStructures FeeStructure[]
 
   // Attendance Records
   attendanceRecords Attendance[]
@@ -313,6 +314,7 @@ model Class {
   schedules Schedule[]
 
   tuitionFee Float @default(0) // Fee for this class
+  feeStructures FeeStructure[]
 
   isDeleted Boolean @default(false)
   deletedAt DateTime?
@@ -323,6 +325,25 @@ model Class {
 
   @@unique([schoolId, name])
   @@index([schoolId])
+}
+
+model FeeStructure {
+  id     String @id @default(uuid())
+  amount Float
+
+  // Keep requested name "gradeId", and map it to existing Class model.
+  gradeId String
+  grade   Class  @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, gradeId])
+  @@index([schoolId])
+  @@index([gradeId])
 }
 
 model Subject {

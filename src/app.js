@@ -25,6 +25,7 @@ app.use('/api/grades', require('./routes/gradesRoutes'));
 app.use('/api/subscriptions', require('./routes/subscriptionRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
+app.use('/api/finance', require('./routes/financeRoutes'));
 app.use('/api/archive', require('./routes/archiveRoutes'));
 app.use('/api/schedules', require('./routes/scheduleRoutes'));
 app.use('/api/admin/plans', require('./routes/admin.plans.routes'));
