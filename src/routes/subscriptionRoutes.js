@@ -8,6 +8,7 @@ const {
     getMySubscriptionController,
     getMyPendingRequestController,
     settleDebtController,
+    addDebtController,
     updateSchoolSubscriptionController
 } = require("../controllers/subscriptionController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
@@ -36,6 +37,9 @@ router.post("/reject/:id", verifyToken, authorize("SUPER_ADMIN"), rejectSubscrip
 
 // Super Admin: Settle debt for a school
 router.post("/settle-debt/:schoolId", verifyToken, authorize("SUPER_ADMIN"), settleDebtController);
+
+// Super Admin: Add debt for a school
+router.post("/add-debt/:schoolId", verifyToken, authorize("SUPER_ADMIN"), addDebtController);
 
 // Super Admin: Update school subscription status/plan
 router.put("/update-school/:schoolId", verifyToken, authorize("SUPER_ADMIN"), updateSchoolSubscriptionController);

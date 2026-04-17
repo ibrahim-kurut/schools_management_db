@@ -7,6 +7,7 @@ const {
     getMySubscriptionService,
     getMyPendingRequestService,
     settleDebtService,
+    addDebtService,
     updateSubscriptionBySuperAdminService
 } = require("../services/subscriptionService");
 const {
@@ -197,6 +198,7 @@ exports.getMyPendingRequestController = asyncHandler(async (req, res) => {
  */
 exports.settleDebtController = asyncHandler(async (req, res) => {
     const { schoolId } = req.params;
+    const { amount } = req.body;
 
     if (!schoolId) {
         return res.status(400).json({
@@ -205,11 +207,43 @@ exports.settleDebtController = asyncHandler(async (req, res) => {
         });
     }
 
-    const updatedSubscription = await settleDebtService(schoolId);
+    const updatedSubscription = await settleDebtService(schoolId, amount);
 
     res.status(200).json({
         success: true,
-        message: "تمت تسوية الديون بنجاح",
+        message: "تم تسديد الدفعة وتحديث سجل الديون بنجاح",
+        data: updatedSubscription
+    });
+});
+
+/**
+ * @description Add debt for a specific school (Super Admin)
+ * @route POST /api/subscriptions/add-debt/:schoolId
+ * @access private (Super Admin only)
+ */
+exports.addDebtController = asyncHandler(async (req, res) => {
+    const { schoolId } = req.params;
+    const { amount } = req.body;
+
+    if (!schoolId) {
+        return res.status(400).json({
+            success: false,
+            message: "School ID is required"
+        });
+    }
+    
+    if (!amount) {
+        return res.status(400).json({
+            success: false,
+            message: "مبلغ الدين مطلوب"
+        });
+    }
+
+    const updatedSubscription = await addDebtService(schoolId, amount);
+
+    res.status(200).json({
+        success: true,
+        message: "تم إضافة الدين للمدرسة بنجاح",
         data: updatedSubscription
     });
 });

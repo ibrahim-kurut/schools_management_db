@@ -342,11 +342,12 @@ exports.getMySubscriptionService = async (schoolId) => {
 };
 
 /**
- * @description Settle debt for a specific school (Super Admin)
+ * @description Settle or pay a portion of debt for a specific school (Super Admin)
  * @param {string} schoolId 
+ * @param {number} amountPaid
  * @returns {Promise<Object>} Updated subscription
  */
-exports.settleDebtService = async (schoolId) => {
+exports.settleDebtService = async (schoolId, amountPaid) => {
     // 1. Verify subscription exists
     const subscription = await prisma.subscription.findUnique({
         where: { schoolId }
@@ -356,15 +357,60 @@ exports.settleDebtService = async (schoolId) => {
         throw new Error("Subscription not found for this school");
     }
 
-    // 2. Update debt to 0
+    // Calculate new debt
+    let newDebt = subscription.currentDebt;
+    if (amountPaid !== undefined && amountPaid !== null) {
+        const numAmount = parseFloat(amountPaid);
+        if (isNaN(numAmount) || numAmount < 0) {
+            throw new Error("Invalid payment amount");
+        }
+        newDebt = Math.max(0, subscription.currentDebt - numAmount);
+    } else {
+        // If no amount provided, settle all debt
+        newDebt = 0;
+    }
+
+    // 2. Update debt
     const updatedSubscription = await prisma.subscription.update({
         where: { schoolId },
         data: {
-            currentDebt: 0
+            currentDebt: newDebt
         }
     });
 
     // 3. Invalidate relevant caches if any (optional, but good practice)
+    await redis.del(`school:${schoolId}`);
+
+    return updatedSubscription;
+};
+
+/**
+ * @description Add debt for a specific school (Super Admin)
+ * @param {string} schoolId 
+ * @param {number} amount
+ * @returns {Promise<Object>} Updated subscription
+ */
+exports.addDebtService = async (schoolId, amount) => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+        throw new Error("يجب تحديد مبلغ صالح لزيادة الدين");
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+        where: { schoolId }
+    });
+
+    if (!subscription) {
+        throw new Error("لم يتم العثور على اشتراك لهذه المدرسة");
+    }
+
+    const updatedSubscription = await prisma.subscription.update({
+        where: { schoolId },
+        data: {
+            currentDebt: subscription.currentDebt + numAmount
+        }
+    });
+
     await redis.del(`school:${schoolId}`);
 
     return updatedSubscription;
