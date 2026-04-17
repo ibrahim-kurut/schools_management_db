@@ -75,6 +75,7 @@ const updateSchoolMemberSchema = Joi.object({
     discountNotes: Joi.string().trim().empty('').optional(),
     motherName: Joi.string().trim().empty('').optional(),
     guardianMaritalStatus: Joi.string().trim().empty('').optional(),
+    studentCode: Joi.string().trim().empty('').optional(),
     role: Joi.string().trim().valid('TEACHER', 'ASSISTANT', 'STUDENT', 'ACCOUNTANT').empty('').optional(),
 });
 

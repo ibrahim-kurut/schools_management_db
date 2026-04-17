@@ -87,9 +87,9 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
 
     // --- Student Special Handling ---
     if (memberRole === "STUDENT") {
-        // A. Verify studentCode is unique within school
+        // A. Verify studentCode is unique within school (including deleted)
         const existingCode = await prisma.user.findFirst({
-            where: { schoolId: school.id, studentCode: memberData.studentCode, isDeleted: false }
+            where: { schoolId: school.id, studentCode: memberData.studentCode }
         });
         if (existingCode) {
             throw new Error(`كود الطالب (${memberData.studentCode}) مستخدم بالفعل في هذه المدرسة`);
@@ -477,6 +477,19 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
         // 6. Owner: Can edit all fields
         dataToUpdate = { ...reqData };
 
+        // Handle studentCode change check
+        if (dataToUpdate.studentCode && dataToUpdate.studentCode !== targetMember.studentCode) {
+            const existingCode = await prisma.user.findFirst({
+                where: { 
+                    schoolId: school.id, 
+                    studentCode: dataToUpdate.studentCode 
+                }
+            });
+            if (existingCode) {
+                throw new Error(`كود الطالب (${dataToUpdate.studentCode}) مستخدم بالفعل في هذه المدرسة`);
+            }
+        }
+
         // Handle className if sent
         if (dataToUpdate.className) {
             // Search for the class by name in the database (better performance than fetching all classes)
@@ -686,12 +699,11 @@ exports.checkStudentCodeService = async (requesterId, code, requesterRole) => {
 
     if (!school) throw new Error("المدرسة غير موجودة");
 
-    // 2. Search for active student with this code in this school
+    // 2. Search for student with this code in this school (including deleted)
     const existing = await prisma.user.findFirst({
         where: {
             schoolId: school.id,
-            studentCode: code,
-            isDeleted: false
+            studentCode: code
         }
     });
 
@@ -794,12 +806,11 @@ exports.bulkImportStudentsService = async (requesterId, requesterRole, classId, 
             throw new Error("يوجد تكرار في أكواد الطلاب داخل الملف. يرجى التأكد من عدم تكرار أي كود.");
         }
 
-        // التحقق من وجود الأكواد مسبقاً في قاعدة البيانات
+        // التحقق من وجود الأكواد مسبقاً في قاعدة البيانات (حتى لو كانت محذوفة)
         const existingCodes = await prisma.user.findMany({
             where: {
                 schoolId: school.id,
-                studentCode: { in: providedCodes },
-                isDeleted: false
+                studentCode: { in: providedCodes }
             },
             select: { studentCode: true }
         });
