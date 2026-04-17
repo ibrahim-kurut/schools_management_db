@@ -31,6 +31,7 @@ app.use('/api/schedules', require('./routes/scheduleRoutes'));
 app.use('/api/admin/plans', require('./routes/admin.plans.routes'));
 app.use('/api/admin/users', require('./routes/superAdminUserRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/notes', require('./routes/noteRoutes'));
 
 // Error Handler Middleware (Must be last)
 app.use(require('./middleware/errorHandler'));
