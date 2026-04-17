@@ -32,7 +32,9 @@ const addSchoolMemberSchema = Joi.object({
     }).messages({
         'any.required': 'كود الطالب مطلوب'
     }),
-    phone: Joi.string().trim().allow(null, '').optional(),
+    phone: Joi.string().trim().pattern(/^\d{10,11}$/).allow(null, '').optional().messages({
+        'string.pattern.base': 'يجب أن يكون رقم الهاتف 10 أو 11 رقماً'
+    }),
     gender: Joi.string().trim().valid('MALE', 'FEMALE').required().messages({
         'any.only': 'Gender must be either MALE or FEMALE',
         'any.required': 'Gender is required'
@@ -65,7 +67,9 @@ const updateSchoolMemberSchema = Joi.object({
     lastName: Joi.string().trim().empty('').optional(),
     email: Joi.string().trim().email().empty('').optional(),
     password: Joi.string().trim().min(6).empty('').optional(),
-    phone: Joi.string().trim().empty('').optional(),
+    phone: Joi.string().trim().pattern(/^\d{10,11}$/).empty('').optional().messages({
+        'string.pattern.base': 'يجب أن يكون رقم الهاتف 10 أو 11 رقماً'
+    }),
     gender: Joi.string().trim().valid('MALE', 'FEMALE').empty('').optional(),
     birthDate: Joi.date().empty('').optional(),
     className: Joi.string().trim().empty('').optional(),

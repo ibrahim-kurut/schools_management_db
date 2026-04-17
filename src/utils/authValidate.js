@@ -19,8 +19,9 @@ const createUserSchema = Joi.object({
         'string.min': 'كلمة المرور يجب ألا تقل عن 6 أحرف',
         'any.required': 'كلمة المرور حقل إلزامي'
     }),
-    phone: Joi.string().trim().required().messages({
+    phone: Joi.string().trim().pattern(/^\d{10,11}$/).required().messages({
         'string.empty': 'رقم الهاتف مطلوب',
+        'string.pattern.base': 'يجب أن يكون رقم الهاتف 10 أو 11 رقماً',
         'any.required': 'رقم الهاتف حقل إلزامي'
     }),
     gender: Joi.string().trim().valid('MALE', 'FEMALE').required().messages({
