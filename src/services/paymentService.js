@@ -145,7 +145,7 @@ exports.getStudentsFeesSummaryService = async (requester, { page, limit, search,
 exports.createPaymentService = async (requester, { studentId, amount, date, paymentType, status, note }) => {
 
     // 1. Verify student exists, is really a STUDENT, and belongs to the SAME school
-    // optimization: select only necessary fields + school slug for invoice
+    // Fetch financial data needed for balance validation
     const student = await prisma.user.findFirst({
         where: {
             id: studentId,
@@ -155,7 +155,23 @@ exports.createPaymentService = async (requester, { studentId, amount, date, paym
         select: {
             id: true,
             school: {
-                select: { slug: true } // Fetch slug for invoice prefix
+                select: { slug: true }
+            },
+            class: {
+                select: { tuitionFee: true }
+            },
+            studentProfile: {
+                select: {
+                    discountAmount: true,
+                    customTuitionFee: true
+                }
+            },
+            paymentsMade: {
+                where: {
+                    paymentType: "TUITION",
+                    status: "COMPLETED"
+                },
+                select: { amount: true }
             }
         }
     });
@@ -164,27 +180,49 @@ exports.createPaymentService = async (requester, { studentId, amount, date, paym
         throw new Error("Student not found or does not belong to your school");
     }
 
+    const parsedAmount = parseFloat(amount);
+
+    // 2. Validate: payment amount must not exceed remaining balance (TUITION only)
+    if (paymentType === "TUITION") {
+        const customFee = student.studentProfile?.customTuitionFee;
+        const baseFee = customFee !== null && customFee !== undefined ? customFee : (student.class?.tuitionFee || 0);
+        const discount = student.studentProfile?.discountAmount || 0;
+        const netRequired = baseFee - discount;
+        const totalPaid = student.paymentsMade.reduce((sum, p) => sum + p.amount, 0);
+        const remainingBalance = netRequired - totalPaid;
+
+        if (parsedAmount > remainingBalance) {
+            throw new Error(
+                `لا يمكن تسجيل دفعة بقيمة ${parsedAmount.toLocaleString()} د.ع لأنها تتجاوز المبلغ المتبقي على الطالب وهو ${Math.max(0, remainingBalance).toLocaleString()} د.ع`
+            );
+        }
+
+        if (remainingBalance <= 0) {
+            throw new Error("لا يوجد رصيد متبقي على هذا الطالب، تم تسديد كامل الأقساط الدراسية");
+        }
+    }
+
     // Helper to generate Invoice Number (e.g. SCH-123456)
     const generateInvoiceNumber = (prefix) => {
         return `${prefix.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
     };
 
-    // 2. Create Payment
+    // 3. Create Payment
     const payment = await prisma.payment.create({
         data: {
             studentId,
             schoolId: requester.schoolId,
             recordedById: requester.id,
-            amount: parseFloat(amount),
+            amount: parsedAmount,
             date: date ? new Date(date) : new Date(),
             paymentType,
             status: status || "COMPLETED",
             note,
-            invoiceNumber: generateInvoiceNumber(student.school.slug.slice(0, 3)) // Use first 3 chars of slug
+            invoiceNumber: generateInvoiceNumber(student.school.slug.slice(0, 3))
         }
     });
 
-    // 3. Get Recorder Name
+    // 4. Get Recorder Name
     const recorder = await prisma.user.findUnique({
         where: { id: requester.id },
         select: { firstName: true, lastName: true }
