@@ -1,12 +1,20 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const { globalLimiter } = require('./middleware/rateLimiter');
 const app = express();
+
+// Trust Proxy for Docker/Nginx
+app.set('trust proxy', 1);
+
+// Apply Global Rate Limiter to all /api routes
+app.use('/api', globalLimiter);
 
 // Middlewares
 app.use(cors({
     origin: 'http://localhost:3000', // Update this to your production URL when ready
     credentials: true,
+    exposedHeaders: ["Retry-After"]
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
