@@ -139,6 +139,14 @@ exports.createSchoolService = async (schoolData) => {
 exports.getAllSchoolsService = async (page, limit, searchWord) => {
     // 1. Counting the number of items we skip
     const skip = (page - 1) * limit;
+    const cacheKey = `schools:p:${page}:l:${limit}:s:${searchWord || 'none'}`;
+
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
 
     // 2. Fetching data with total count
     const [schools, totalSchools] = await Promise.all([
@@ -196,7 +204,7 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
     const totalPages = Math.ceil(totalSchools / limit);
 
     // 4. Returning data with pagination info
-    return {
+    const result = {
         schools,
         currentPage: page,
         totalPages,
@@ -204,6 +212,15 @@ exports.getAllSchoolsService = async (page, limit, searchWord) => {
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1
     };
+
+    // 5. Save to Redis Cache (30 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 1800);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 }
 /**
  * @description Get a school by id
@@ -352,6 +369,15 @@ exports.deleteSchoolByIdService = async (id, userId, userRole) => {
  * @access private
  */
 exports.getSchoolStatsOverviewService = async (schoolId) => {
+    const cacheKey = `school:${schoolId}:stats`;
+    
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
     const [totalStudents, totalStaff, totalClasses, totalRevenueResult] = await Promise.all([
         prisma.user.count({ where: { schoolId, role: 'STUDENT', isDeleted: false } }),
         prisma.user.count({ where: { schoolId, role: { in: ['TEACHER', 'ASSISTANT', 'ACCOUNTANT', 'SCHOOL_ADMIN'] }, isDeleted: false } }),
@@ -362,10 +388,20 @@ exports.getSchoolStatsOverviewService = async (schoolId) => {
         })
     ]);
 
-    return {
+    const stats = {
         totalStudents: totalStudents || 0,
         totalStaff: totalStaff || 0,
         totalClasses: totalClasses || 0,
         totalRevenue: totalRevenueResult._sum.amount || 0
     };
-}
+
+    // Cache for 10 minutes (600 seconds)
+    try {
+        await redis.set(cacheKey, JSON.stringify(stats), 'EX', 600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return stats;
+}
+

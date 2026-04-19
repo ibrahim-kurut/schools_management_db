@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 /**
  * @description Update student discount
@@ -26,7 +27,7 @@ exports.updateStudentDiscountService = async (requesterId, studentId, { discount
     }
 
     // 3. Update or Create StudentProfile
-    return await prisma.studentProfile.upsert({
+    const result = await prisma.studentProfile.upsert({
         where: { userId: studentId },
         update: {
             discountAmount: parseFloat(discountAmount),
@@ -38,6 +39,14 @@ exports.updateStudentDiscountService = async (requesterId, studentId, { discount
             discountNotes: discountNotes
         }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
+    await redis.delByPattern(`school:${requester.schoolId}:fees-summary:*`);
+
+    return result;
 };
 
 /**
@@ -63,6 +72,15 @@ exports.getStudentsFeesSummaryService = async (requester, { page, limit, search,
 
     if (classFilter && classFilter !== "ALL") {
         whereClause.class = { name: classFilter };
+    }
+
+    // 0. Check Redis Cache
+    const cacheKey = `school:${requester.schoolId}:fees-summary:p:${page}:l:${limit}:s:${search || 'none'}:c:${classFilter || 'none'}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
     }
 
     // 2. Fetch Total Count for Pagination
@@ -127,7 +145,7 @@ exports.getStudentsFeesSummaryService = async (requester, { page, limit, search,
         };
     });
 
-    return {
+    const result = {
         students: formattedStudents,
         pagination: {
             currentPage: page,
@@ -136,6 +154,15 @@ exports.getStudentsFeesSummaryService = async (requester, { page, limit, search,
             itemsPerPage: limit
         }
     };
+
+    // Save to Redis Cache (15 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 900);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };
 
 /**
@@ -227,6 +254,12 @@ exports.createPaymentService = async (requester, { studentId, amount, date, paym
         where: { id: requester.id },
         select: { firstName: true, lastName: true }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
+    await redis.delByPattern(`school:${requester.schoolId}:fees-summary:*`);
 
     return {
         ...payment,
@@ -350,7 +383,7 @@ exports.updatePaymentService = async (requester, paymentId, updateData) => {
     // 2. Perform Update
     const { amount, date, paymentType, note, status } = updateData;
 
-    return await prisma.payment.update({
+    const updatedPayment = await prisma.payment.update({
         where: { id: paymentId },
         data: {
             amount: amount !== undefined ? parseFloat(amount) : undefined,
@@ -360,4 +393,12 @@ exports.updatePaymentService = async (requester, paymentId, updateData) => {
             note
         }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
+    await redis.delByPattern(`school:${requester.schoolId}:fees-summary:*`);
+
+    return updatedPayment;
 };

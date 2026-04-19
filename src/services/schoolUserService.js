@@ -201,8 +201,12 @@ exports.addMemberService = async (requesterId, memberData, file, requesterRole) 
     }
 
 
-    // 8. Invalidate Classes Cache
+    // 8. Invalidate Caches
     await redis.del(`school:${school.id}:classes`);
+    await redis.del(`school:${school.id}:stats`);
+    await redis.delByPattern(`school:${school.id}:members:*`);
+    await redis.del(`school:${school.id}:finance-stats`);
+    await redis.delByPattern(`school:${school.id}:fees-summary:*`);
 
     // Return user without sensitive data
     const { password, ...userWithoutPassword } = newUser;
@@ -242,6 +246,15 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
 
     if (!school) {
         throw new Error("المدرسة غير موجودة أو انتهت صلاحية الجلسة");
+    }
+
+    // 1.5. Check Redis Cache
+    const cacheKey = `school:${school.id}:members:p:${page}:l:${limit}:s:${searchWord || 'none'}:r:${roleFilter || 'none'}:e:${excludeRole || 'none'}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
     }
 
     // 2. Build dynamic where clause
@@ -312,11 +325,20 @@ exports.getAllMembersService = async (requesterId, page, limit, searchWord, role
         }
     });
 
-    return {
+    const result = {
         school,
         members,
         totalMembers
     };
+
+    // 5. Save to Redis Cache (15 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 900);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };
 
 
@@ -351,6 +373,15 @@ exports.getMemberByIdService = async (requesterId, memberId, requesterRole) => {
 
     if (!school) {
         throw new Error("المدرسة غير موجودة أو انتهت صلاحية الجلسة");
+    }
+
+    // 1.5. Check Redis Cache
+    const cacheKey = `school:${school.id}:member:${memberId}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
     }
 
     // 2. Get Member by ID
@@ -399,6 +430,13 @@ exports.getMemberByIdService = async (requesterId, memberId, requesterRole) => {
     // 3. Check if Member belongs to the School
     if (member.schoolId !== school.id) {
         throw new Error("Member does not belong to this school");
+    }
+
+    // 4. Save to Redis Cache (1 hour)
+    try {
+        await redis.set(cacheKey, JSON.stringify(member), 'EX', 3600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
     }
 
     return member;
@@ -619,8 +657,14 @@ exports.updateMemberByIdService = async (ownerId, memberId, reqData, file, reque
         }
     });
 
-    // 8. Invalidate Classes Cache
+    // 8. Invalidate Caches
     await redis.del(`school:${school.id}:classes`);
+    await redis.del(`school:${school.id}:stats`);
+    await redis.del(`school:${school.id}:member:${memberId}`);
+    await redis.delByPattern(`school:${school.id}:members:*`);
+    await redis.del(`school:${school.id}:finance-stats`);
+    await redis.delByPattern(`school:${school.id}:fees-summary:*`);
+    await redis.delByPattern(`school:${school.id}:finance-dashboard:*`);
 
     return updatedMember;
 }
@@ -673,8 +717,14 @@ exports.deleteMemberByIdService = async (ownerId, memberId) => {
         }
     });
 
-    // 4. Invalidate Classes Cache
+    // 4. Invalidate Caches
     await redis.del(`school:${school.id}:classes`);
+    await redis.del(`school:${school.id}:stats`);
+    await redis.del(`school:${school.id}:member:${memberId}`);
+    await redis.delByPattern(`school:${school.id}:members:*`);
+    await redis.del(`school:${school.id}:finance-stats`);
+    await redis.delByPattern(`school:${school.id}:fees-summary:*`);
+    await redis.delByPattern(`school:${school.id}:finance-dashboard:*`);
 
     return deletedMember;
 }
@@ -895,8 +945,12 @@ exports.bulkImportStudentsService = async (requesterId, requesterRole, classId, 
         });
     }
 
-    // 10. Invalidate Classes Cache
+    // 10. Invalidate Caches
     await redis.del(`school:${school.id}:classes`);
+    await redis.del(`school:${school.id}:stats`);
+    await redis.delByPattern(`school:${school.id}:members:*`);
+    await redis.del(`school:${school.id}:finance-stats`);
+    await redis.delByPattern(`school:${school.id}:fees-summary:*`);
 
     return {
         importedCount: result.count,

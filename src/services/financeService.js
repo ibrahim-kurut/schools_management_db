@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 const { validateId } = require("../utils/validateUUID");
 const XLSX = require("xlsx");
 
@@ -66,6 +67,15 @@ const getRecentMonths = (count) => {
 exports.getFinanceStatsService = async (requester, schoolId) => {
     const school = await assertSchoolAccess(requester, schoolId);
 
+    // 0. Check Redis Cache
+    const cacheKey = `school:${schoolId}:finance-stats`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
     const [paymentsAgg, expensesAgg, studentCountsByClass] = await Promise.all([
         prisma.payment.aggregate({
             where: { schoolId },
@@ -130,7 +140,7 @@ exports.getFinanceStatsService = async (requester, schoolId) => {
 
     const noFinancialData = totalRevenue === 0 && totalExpenses === 0 && studentCountsByClass.length === 0;
 
-    return {
+    const result = {
         noFinancialData,
         school: {
             id: school.id,
@@ -141,6 +151,15 @@ exports.getFinanceStatsService = async (requester, schoolId) => {
         netBalance,
         pendingPayments
     };
+
+    // Save to Redis Cache (10 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };
 
 exports.getMonthlyFinanceReportService = async (requester, schoolId, month) => {
@@ -275,7 +294,17 @@ exports.exportMonthlyFinanceReportService = async (requester, schoolId, month) =
 
 exports.getFinanceDashboardDetailsService = async (requester, schoolId, months = 6) => {
     await assertSchoolAccess(requester, schoolId);
+    
+    // 0. Check Redis Cache
     const normalizedMonths = Math.min(Math.max(parseInt(months, 10) || 6, 1), 12);
+    const cacheKey = `school:${schoolId}:finance-dashboard:months:${normalizedMonths}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
     const monthRefs = getRecentMonths(normalizedMonths);
 
     const [payments, expenses] = await Promise.all([
@@ -323,5 +352,14 @@ exports.getFinanceDashboardDetailsService = async (requester, schoolId, months =
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .slice(0, 10);
 
-    return { chartData, recentOperations };
+    const result = { chartData, recentOperations };
+
+    // Save to Redis Cache (15 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 900);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };

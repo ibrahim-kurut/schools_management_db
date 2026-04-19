@@ -1,6 +1,8 @@
 const prisma = require("../utils/prisma");
 const { MANUAL_EXAM_TYPES, CALCULATED_EXAM_TYPES } = require("../utils/gradesValidate");
 const { calculateAveragesIfNeeded } = require("./gradeCalculations");
+const redis = require("../config/redis");
+
 
 /**
  * @description create a new grade
@@ -97,7 +99,12 @@ exports.createGradeService = async (gradeData, schoolId, userId, userRole) => {
 
             // B. Calculate Averages
             await calculateAveragesIfNeeded(tx, studentId, subjectId, academicYearId, userId);
+            // C. Invalidate Caches
+            await redis.del(`school:${schoolId}:student:${studentId}:grades`);
+            await redis.delByPattern(`school:${schoolId}:class:*:results*`);
+
             return newGrade;
+
         });
 
         return result;
@@ -183,6 +190,15 @@ exports.getGradesByStudentIdService = async (studentId, schoolId, userRole, acad
  * @access private (student only )
  */
 exports.getStudentGradesService = async (studentId, schoolId, userRole) => {
+    // 0. Check Redis Cache
+    const cacheKey = `school:${schoolId}:student:${studentId}:grades`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
     // 1. Verifying the presence of student at school
     const student = await prisma.user.findFirst({
         where: { id: studentId, role: 'STUDENT', schoolId, isDeleted: false },
@@ -213,7 +229,15 @@ exports.getStudentGradesService = async (studentId, schoolId, userRole) => {
         }
     });
 
+    // 3. Save to Redis Cache (30 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(grades), 'EX', 1800);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
     return grades;
+
 };
 
 
@@ -372,7 +396,12 @@ exports.updateGradeService = async (studentId, updateData, schoolId, userId, use
                 userId
             );
 
+            // C. Invalidate Caches
+            await redis.del(`school:${schoolId}:student:${existingGrade.studentId}:grades`);
+            await redis.delByPattern(`school:${schoolId}:class:*:results*`);
+
             return updated;
+
         });
 
         return result;
@@ -443,7 +472,12 @@ exports.deleteGradeService = async (gradeId, schoolId, userId, userRole) => {
                 userId
             );
 
+            // C. Invalidate Caches
+            await redis.del(`school:${schoolId}:student:${existingGrade.studentId}:grades`);
+            await redis.delByPattern(`school:${schoolId}:class:*:results*`);
+
             return deleted;
+
         });
 
         return result;
@@ -515,6 +549,8 @@ exports.getTeacherClassGradesService = async (schoolId, teacherId, classId, acad
     return grades;
 };
 
+
+
 /**
  * @description Get all student results for a class (used by school admin/assistant for viewing & printing)
  * Returns: class info, subjects, students with all their grades, school info, academic year
@@ -530,6 +566,15 @@ exports.getClassStudentResultsService = async (schoolId, classId, academicYearId
         });
         if (!currentYear) throw { statusCode: 404, message: "لا توجد سنة دراسية حالية" };
         filterYearId = currentYear.id;
+    }
+
+    // 1.5. Check Redis Cache
+    const cacheKey = `school:${schoolId}:class:${classId}:results:year:${filterYearId}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
     }
 
     // 2. Fetch class with subjects and students, plus school and academic year info - all in parallel
@@ -596,7 +641,7 @@ exports.getClassStudentResultsService = async (schoolId, classId, academicYearId
         }
     });
 
-    return {
+    const result = {
         classData: {
             id: classData.id,
             name: classData.name
@@ -614,4 +659,13 @@ exports.getClassStudentResultsService = async (schoolId, classId, academicYearId
             name: academicYear.name
         }
     };
+
+    // 4. Save to Redis Cache (30 minutes)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 1800);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };

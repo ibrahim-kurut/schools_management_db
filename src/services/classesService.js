@@ -55,8 +55,9 @@ exports.createClassService = async (schoolId, classData) => {
             studentsCount: newClass._count.students
         };
 
-        // 5. Invalidate List Cache
+        // 5. Invalidate Caches
         await redis.del(`school:${schoolId}:classes`);
+        await redis.del(`school:${schoolId}:stats`);
 
         // 6. return the class
         return {
@@ -173,6 +174,14 @@ exports.getAllClassesService = async (schoolId, schoolSlug = null) => {
  */
 exports.getClassStudentsService = async (schoolId, classId) => {
     try {
+        // 0. Check Redis Cache
+        const cacheKey = `school:${schoolId}:class:${classId}:students`;
+        try {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        } catch (err) {
+            console.error("Redis Get Error:", err);
+        }
 
         // Optimized: Single query to check existence and fetch students
         const classWithStudents = await prisma.class.findFirst({
@@ -207,16 +216,25 @@ exports.getClassStudentsService = async (schoolId, classId) => {
             return { status: "NOT_FOUND", message: "لا يوجد طلاب مسجلين في هذا الصف." };
         }
 
-        // 4. return students
-        return {
+        const result = {
             status: "SUCCESS",
             message: "Students fetched successfully",
             students: classWithStudents.students,
         };
+
+        // 4. Save to Redis Cache (30 minutes)
+        try {
+            await redis.set(cacheKey, JSON.stringify(result), 'EX', 1800);
+        } catch (err) {
+            console.error("Redis Set Error:", err);
+        }
+
+        return result;
     } catch (error) {
         throw error;
     }
 };
+
 
 /**
  * @description get class by ID with students list
@@ -357,9 +375,11 @@ exports.updateClassService = async (schoolId, classId, classData) => {
             class: mappedClass
         };
 
-        // 5. Invalidate Caches (List + Item)
+        // 5. Invalidate Caches (List + Item + Students + Stats)
         await redis.del(`school:${schoolId}:classes`);
         await redis.del(`school:${schoolId}:class:${classId}`);
+        await redis.del(`school:${schoolId}:class:${classId}:students`);
+        await redis.del(`school:${schoolId}:stats`);
 
         return result;
     } catch (error) {
@@ -418,9 +438,11 @@ exports.deleteClassService = async (schoolId, classId) => {
             });
         }
 
-        // 5. Invalidate Caches (List + Item)
+        // 5. Invalidate Caches (List + Item + Students + Stats)
         await redis.del(`school:${schoolId}:classes`);
         await redis.del(`school:${schoolId}:class:${classId}`);
+        await redis.del(`school:${schoolId}:class:${classId}:students`);
+        await redis.del(`school:${schoolId}:stats`);
 
         return {
             status: "SUCCESS",

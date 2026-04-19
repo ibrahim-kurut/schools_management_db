@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const redis = require("../config/redis");
 
 /**
  * @description Helper to validate expense recipient and role for Salaries
@@ -76,6 +77,11 @@ exports.createExpenseService = async (requester, expenseData) => {
             },
         }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
 
     return expense;
 };
@@ -209,7 +215,7 @@ exports.updateExpenseService = async (requester, expenseId, updateData) => {
     // 3. Update the expense
     const { title, amount, date, type, recipientId, recipientName } = updateData;
 
-    return await prisma.expense.update({
+    const updatedExpense = await prisma.expense.update({
         where: { id: expenseId },
         data: {
             title,
@@ -246,6 +252,13 @@ exports.updateExpenseService = async (requester, expenseId, updateData) => {
             },
         }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
+
+    return updatedExpense;
 };
 
 /**
@@ -268,10 +281,17 @@ exports.deleteExpenseService = async (requester, expenseId) => {
     }
 
     // 2. Soft delete
-    return await prisma.expense.update({
+    const deleted = await prisma.expense.update({
         where: { id: expenseId },
         data: {
             isDeleted: true
         }
     });
+
+    // Invalidate All Finance/Stats Caches
+    await redis.del(`school:${requester.schoolId}:stats`);
+    await redis.del(`school:${requester.schoolId}:finance-stats`);
+    await redis.delByPattern(`school:${requester.schoolId}:finance-dashboard:*`);
+
+    return deleted;
 };

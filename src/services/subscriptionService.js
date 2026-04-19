@@ -213,7 +213,8 @@ exports.approveSubscriptionService = async (requestId, adminNotes) => {
         redis.del('subscription-requests-PENDING'),
         redis.del('subscription-requests-APPROVED'),
         redis.del('subscription-requests-REJECTED'),
-        redis.del('subscription-requests-count')
+        redis.del('subscription-requests-count'),
+        redis.del(`school:${request.schoolId}:subscription`)
     ]);
 
     return result;
@@ -273,7 +274,8 @@ exports.rejectSubscriptionService = async (requestId, adminNotes) => {
         redis.del('subscription-requests-PENDING'),
         redis.del('subscription-requests-APPROVED'),
         redis.del('subscription-requests-REJECTED'),
-        redis.del('subscription-requests-count')
+        redis.del('subscription-requests-count'),
+        redis.del(`school:${updatedRequest.schoolId}:subscription`)
     ]);
 
     return updatedRequest;
@@ -309,6 +311,15 @@ exports.getPendingRequestsCountService = async () => {
  * @returns {Promise<Object>} Subscription details with plan and usage
  */
 exports.getMySubscriptionService = async (schoolId) => {
+    // 0. Check Redis Cache
+    const cacheKey = `school:${schoolId}:subscription`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
     // 1. Fetch subscription with plan
     const subscription = await prisma.subscription.findUnique({
         where: { schoolId },
@@ -330,7 +341,7 @@ exports.getMySubscriptionService = async (schoolId) => {
         }
     });
 
-    return {
+    const result = {
         ...subscription,
         usage: {
             studentCount,
@@ -339,6 +350,15 @@ exports.getMySubscriptionService = async (schoolId) => {
             totalLimit: subscription.plan.maxStudents + subscription.plan.bufferStudents
         }
     };
+
+    // 3. Save to Redis Cache (1 hour)
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
 };
 
 /**
@@ -378,8 +398,9 @@ exports.settleDebtService = async (schoolId, amountPaid) => {
         }
     });
 
-    // 3. Invalidate relevant caches if any (optional, but good practice)
+    // 3. Invalidate relevant caches
     await redis.del(`school:${schoolId}`);
+    await redis.del(`school:${schoolId}:subscription`);
 
     return updatedSubscription;
 };
@@ -412,6 +433,7 @@ exports.addDebtService = async (schoolId, amount) => {
     });
 
     await redis.del(`school:${schoolId}`);
+    await redis.del(`school:${schoolId}:subscription`);
 
     return updatedSubscription;
 };
@@ -457,6 +479,7 @@ exports.updateSubscriptionBySuperAdminService = async (schoolId, data) => {
 
     // 4. Invalidate cache
     await redis.del(`school:${schoolId}`);
+    await redis.del(`school:${schoolId}:subscription`);
 
     return updatedSubscription;
 };
