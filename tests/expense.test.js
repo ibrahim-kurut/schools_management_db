@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const prisma = require('../src/utils/prisma');
 const app = require('../src/app');
 const { generateToken } = require('../src/utils/auth');
@@ -111,7 +117,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(expenseData)
                 .expect(201);
 
@@ -131,7 +137,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(expenseData)
                 .expect(201);
 
@@ -149,7 +155,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(expenseData)
                 .expect(500);
 
@@ -180,7 +186,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`) // School 1 accountant
+                .set('Cookie', accountantToken) // School 1 accountant
                 .send(expenseData)
                 .expect(500);
 
@@ -197,7 +203,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(expenseData)
                 .expect(500);
 
@@ -207,7 +213,7 @@ describe('Expense Management System Tests', () => {
         it('should fail validation with negative amount', async () => {
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send({
                     title: "Test",
                     amount: -100,
@@ -221,7 +227,7 @@ describe('Expense Management System Tests', () => {
         it('should fail if unauthorized role (STUDENT) tries to create expense', async () => {
             const res = await request(app)
                 .post('/api/expenses')
-                .set('Authorization', `Bearer ${studentToken}`)
+                .set('Cookie', studentToken)
                 .send({
                     title: "Self Payment",
                     amount: 100,
@@ -247,7 +253,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .get('/api/expenses?page=1&limit=2')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -261,7 +267,7 @@ describe('Expense Management System Tests', () => {
         it('should default to page 1 and limit 10 if not provided', async () => {
             const res = await request(app)
                 .get('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -278,7 +284,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .get(`/api/expenses/${expense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -290,7 +296,7 @@ describe('Expense Management System Tests', () => {
         it('should return 404 if expense not found', async () => {
             const res = await request(app)
                 .get('/api/expenses/00000000-0000-0000-0000-000000000000') // UUID that doesn't exist
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(404);
 
             expect(res.body.status).toBe("FAIL");
@@ -310,7 +316,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .get(`/api/expenses/${otherExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`) // Accountant from first school
+                .set('Cookie', accountantToken) // Accountant from first school
                 .expect(404);
         });
     });
@@ -338,7 +344,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .put(`/api/expenses/${testExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(updateData)
                 .expect(200);
 
@@ -350,7 +356,7 @@ describe('Expense Management System Tests', () => {
         it('should fail if trying to update an expense to SALARY without recipient', async () => {
             const res = await request(app)
                 .put(`/api/expenses/${testExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send({ type: "SALARY" })
                 .expect(500);
 
@@ -360,7 +366,7 @@ describe('Expense Management System Tests', () => {
         it('should successfully update to SALARY with valid recipient', async () => {
             const res = await request(app)
                 .put(`/api/expenses/${testExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send({ type: "SALARY", recipientId: teacherId })
                 .expect(200);
 
@@ -383,7 +389,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .put(`/api/expenses/${otherExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send({ title: "Hack Attempt" })
                 .expect(500);
 
@@ -409,7 +415,7 @@ describe('Expense Management System Tests', () => {
         it('should successfully soft delete an expense', async () => {
             const res = await request(app)
                 .delete(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -425,13 +431,13 @@ describe('Expense Management System Tests', () => {
             // First delete it
             await request(app)
                 .delete(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             // Try to delete again
             const res = await request(app)
                 .delete(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(500);
 
             expect(res.body.message).toMatch(/Expense record not found/);
@@ -441,13 +447,13 @@ describe('Expense Management System Tests', () => {
             // First delete it
             await request(app)
                 .delete(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             // Fetch all
             const res = await request(app)
                 .get('/api/expenses')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             // Verify the deleted expense is not in the list
@@ -459,13 +465,13 @@ describe('Expense Management System Tests', () => {
             // First delete it
             await request(app)
                 .delete(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             // Fetch by ID
             const res = await request(app)
                 .get(`/api/expenses/${expenseToDelete.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(404);
 
             expect(res.body.status).toBe("FAIL");
@@ -485,7 +491,7 @@ describe('Expense Management System Tests', () => {
 
             const res = await request(app)
                 .delete(`/api/expenses/${otherExpense.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(500);
 
             expect(res.body.message).toMatch(/You do not have permission to delete this expense/);

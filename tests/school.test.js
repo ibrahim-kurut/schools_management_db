@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const bcrypt = require('bcrypt');
 const app = require('../src/app');
 const prisma = require('../src/utils/prisma');
@@ -85,7 +91,7 @@ describe('School System Tests', () => {
                 email: testSchoolAdmin.email,
                 password: testSchoolAdmin.password
             });
-        schoolAdminToken = loginSchoolAdmin.body.userData.token;
+        schoolAdminToken = loginSchoolAdmin.headers['set-cookie'];
 
         // 5. Login Super Admin to get token
         const loginSuperAdmin = await request(app)
@@ -94,7 +100,7 @@ describe('School System Tests', () => {
                 email: testSuperAdmin.email,
                 password: testSuperAdmin.password
             });
-        superAdminToken = loginSuperAdmin.body.userData.token;
+        superAdminToken = loginSuperAdmin.headers['set-cookie'];
     });
 
     // =============== Clean up after tests ===============
@@ -113,7 +119,7 @@ describe('School System Tests', () => {
         it('should create a new school successfully', async () => {
             const res = await request(app)
                 .post('/api/schools')
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send(testSchool)
                 .expect(201)
                 .expect('Content-Type', /json/);
@@ -130,7 +136,7 @@ describe('School System Tests', () => {
         it('should fail to create school with duplicate name', async () => {
             const res = await request(app)
                 .post('/api/schools')
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send(testSchool)
                 .expect(400);
 
@@ -151,7 +157,7 @@ describe('School System Tests', () => {
         it('should fail validation when name is missing', async () => {
             const res = await request(app)
                 .post('/api/schools')
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send({ address: "No name school" })
                 .expect(400);
 
@@ -166,7 +172,7 @@ describe('School System Tests', () => {
         it('should get all schools successfully as Super Admin', async () => {
             const res = await request(app)
                 .get('/api/schools')
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(200);
 
             expect(res.body).toHaveProperty('schools');
@@ -177,7 +183,7 @@ describe('School System Tests', () => {
         it('should get school by id successfully', async () => {
             const res = await request(app)
                 .get(`/api/schools/${createdSchoolId}`)
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .expect(200);
 
             expect(res.body).toHaveProperty('school');
@@ -189,7 +195,7 @@ describe('School System Tests', () => {
             const fakeId = '1484ed2f-abd3-43ad-a9ea-b6df15d485f8';
             const res = await request(app)
                 .get(`/api/schools/${fakeId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(404);
 
             expect(res.body.message).toMatch(/not found/i);
@@ -204,7 +210,7 @@ describe('School System Tests', () => {
             const updatedData = { address: "456 Updated Street" };
             const res = await request(app)
                 .put(`/api/schools/${createdSchoolId}`)
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send(updatedData)
                 .expect(200);
 
@@ -220,7 +226,7 @@ describe('School System Tests', () => {
         it('should delete school successfully', async () => {
             const res = await request(app)
                 .delete(`/api/schools/${createdSchoolId}`)
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .expect(200);
 
             expect(res.body.message).toMatch(/deleted/i);
@@ -230,7 +236,7 @@ describe('School System Tests', () => {
         it('should return 404 when deleting non-existent school', async () => {
             const res = await request(app)
                 .delete(`/api/schools/${createdSchoolId}`)
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .expect(404);
 
             expect(res.body.message).toMatch(/not found/i);

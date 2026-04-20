@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const bcrypt = require('bcrypt');
 const app = require('../src/app');
 const prisma = require('../src/utils/prisma');
@@ -149,14 +155,14 @@ describe('Payment System Tests', () => {
             .post(`/api/auth/${testSchool.slug}/login`)
             .send({ email: accountantUser.email, password: accountantUser.password });
 
-        accountantToken = logResAccountant.body.userData.token;
+        accountantToken = logResAccountant.headers['set-cookie'];
 
         // Login Student
         const logResStudent = await request(app)
             .post(`/api/auth/${testSchool.slug}/login`)
             .send({ email: studentUser.email, password: studentUser.password });
 
-        studentToken = logResStudent.body.userData.token;
+        studentToken = logResStudent.headers['set-cookie'];
     });
 
     beforeEach(async () => {
@@ -186,7 +192,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .post('/api/payments')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(paymentData)
                 .expect(201);
 
@@ -206,7 +212,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .post('/api/payments')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(paymentData)
                 .expect(201);
 
@@ -221,7 +227,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .post('/api/payments')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(paymentData)
                 .expect(400);
 
@@ -237,7 +243,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .post('/api/payments')
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(paymentData)
                 .expect(500); // Service throws Error, usually 500
 
@@ -253,7 +259,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .post('/api/payments')
-                .set('Authorization', `Bearer ${accountantToken}`) // Accountant from School 1
+                .set('Cookie', accountantToken) // Accountant from School 1
                 .send(paymentData)
                 .expect(500); // Service throws "Student not found or does not belong..."
         });
@@ -314,7 +320,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .get(`/api/payments/financial-record/${studentId}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -330,7 +336,7 @@ describe('Payment System Tests', () => {
         it('should allow a student to view their own record', async () => {
             const res = await request(app)
                 .get(`/api/payments/financial-record/${studentId}`)
-                .set('Authorization', `Bearer ${studentToken}`)
+                .set('Cookie', studentToken)
                 .expect(200);
 
             expect(res.body.status).toBe("SUCCESS");
@@ -354,7 +360,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .get(`/api/payments/financial-record/${secondStudentInSameSchool.id}`)
-                .set('Authorization', `Bearer ${studentToken}`) // Logged in as first student
+                .set('Cookie', studentToken) // Logged in as first student
                 .expect(500); // Service throws "Access denied: You can only view your own..."
 
             expect(res.body.message).toMatch(/Access denied/);
@@ -363,7 +369,7 @@ describe('Payment System Tests', () => {
         it('should fail if student belongs to another school', async () => {
             const res = await request(app)
                 .get(`/api/payments/financial-record/${otherStudentId}`)
-                .set('Authorization', `Bearer ${accountantToken}`) // School 1 accountant
+                .set('Cookie', accountantToken) // School 1 accountant
                 .expect(500);
 
             expect(res.body.message).toMatch(/You do not have permission/);
@@ -394,7 +400,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .put(`/api/payments/${paymentToUpdateId}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send(updateData)
                 .expect(200);
 
@@ -416,7 +422,7 @@ describe('Payment System Tests', () => {
 
             const res = await request(app)
                 .put(`/api/payments/${otherSchoolPayment.id}`)
-                .set('Authorization', `Bearer ${accountantToken}`) // School 1 accountant
+                .set('Cookie', accountantToken) // School 1 accountant
                 .send({ amount: 600 })
                 .expect(500);
 
@@ -426,7 +432,7 @@ describe('Payment System Tests', () => {
         it('should fail validation with invalid amount', async () => {
             const res = await request(app)
                 .put(`/api/payments/${paymentToUpdateId}`)
-                .set('Authorization', `Bearer ${accountantToken}`)
+                .set('Cookie', accountantToken)
                 .send({ amount: -50 })
                 .expect(400);
 

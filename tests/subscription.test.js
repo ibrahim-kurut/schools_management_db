@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const bcrypt = require('bcryptjs');
 const app = require('../src/app');
 const prisma = require('../src/utils/prisma');
@@ -95,13 +101,13 @@ describe('Subscription System Tests', () => {
             email: testSuperAdmin.email,
             password: testSuperAdmin.password
         });
-        superAdminToken = superLogin.body.userData.token;
+        superAdminToken = superLogin.headers['set-cookie'];
 
         const ownerLogin = await request(app).post('/api/auth/login').send({
             email: testSchoolOwner.email,
             password: testSchoolOwner.password
         });
-        schoolAdminToken = ownerLogin.body.userData.token;
+        schoolAdminToken = ownerLogin.headers['set-cookie'];
     });
 
     afterAll(async () => {
@@ -114,7 +120,7 @@ describe('Subscription System Tests', () => {
         it('should create a subscription request successfully', async () => {
             const res = await request(app)
                 .post('/api/subscriptions/request')
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send({
                     planId,
                     paymentReceipt: "https://example.com/receipt.jpg"
@@ -129,7 +135,7 @@ describe('Subscription System Tests', () => {
         it('should fail if a pending request already exists', async () => {
             const res = await request(app)
                 .post('/api/subscriptions/request')
-                .set('Authorization', `Bearer ${schoolAdminToken}`)
+                .set('Cookie', schoolAdminToken)
                 .send({ planId });
 
             expect(res.status).toBe(400);
@@ -141,7 +147,7 @@ describe('Subscription System Tests', () => {
         it('should allow Super Admin to get all requests', async () => {
             const res = await request(app)
                 .get('/api/subscriptions/requests')
-                .set('Authorization', `Bearer ${superAdminToken}`);
+                .set('Cookie', superAdminToken);
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
@@ -152,7 +158,7 @@ describe('Subscription System Tests', () => {
         it('should allow filtering by status', async () => {
             const res = await request(app)
                 .get('/api/subscriptions/requests?status=PENDING')
-                .set('Authorization', `Bearer ${superAdminToken}`);
+                .set('Cookie', superAdminToken);
 
             expect(res.status).toBe(200);
             expect(res.body.data.every(r => r.status === 'PENDING')).toBe(true);
@@ -161,7 +167,7 @@ describe('Subscription System Tests', () => {
         it('should fail for non-Super Admin', async () => {
             const res = await request(app)
                 .get('/api/subscriptions/requests')
-                .set('Authorization', `Bearer ${schoolAdminToken}`);
+                .set('Cookie', schoolAdminToken);
 
             expect(res.status).toBe(403);
         });
@@ -171,7 +177,7 @@ describe('Subscription System Tests', () => {
         it('should return the correct count of pending requests', async () => {
             const res = await request(app)
                 .get('/api/subscriptions/requests/count')
-                .set('Authorization', `Bearer ${superAdminToken}`);
+                .set('Cookie', superAdminToken);
 
             expect(res.status).toBe(200);
             expect(res.body.data.count).toBeGreaterThan(0);
@@ -182,7 +188,7 @@ describe('Subscription System Tests', () => {
         it('should approve a subscription request and create subscription', async () => {
             const res = await request(app)
                 .post(`/api/subscriptions/approve/${subscriptionRequestId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send({ adminNotes: "Approved by test" });
 
             expect(res.status).toBe(200);
@@ -200,7 +206,7 @@ describe('Subscription System Tests', () => {
         it('should fail to approve an already approved request', async () => {
             const res = await request(app)
                 .post(`/api/subscriptions/approve/${subscriptionRequestId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`);
+                .set('Cookie', superAdminToken);
 
             expect(res.status).toBe(400);
             expect(res.body.message).toMatch(/already approved/i);
@@ -225,7 +231,7 @@ describe('Subscription System Tests', () => {
         it('should reject a subscription request', async () => {
             const res = await request(app)
                 .post(`/api/subscriptions/reject/${secondRequestId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send({ adminNotes: "Invalid receipt" });
 
             expect(res.status).toBe(200);
@@ -240,7 +246,7 @@ describe('Subscription System Tests', () => {
 
             const rejectRes = await request(app)
                 .post(`/api/subscriptions/reject/${res.id}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send({}); // adminNotes is required for rejection in validation
 
             expect(rejectRes.status).toBe(400);

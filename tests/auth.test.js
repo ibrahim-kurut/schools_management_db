@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const app = require('../src/app');
 const prisma = require('../src/utils/prisma');
 
@@ -110,11 +116,11 @@ describe('Auth System Tests', () => {
                 .expect(200)
                 .expect('Content-Type', /json/);
 
-            expect(res.body.userData).toHaveProperty('token');
-            expect(res.body.userData.token).toBeTruthy();
+            expect(res.headers).toHaveProperty('set-cookie');
+
 
             // Saving the token for future tests
-            authToken = res.body.userData.token;
+            authToken = res.headers['set-cookie'];
 
             // Checking user data
             expect(res.body.userData.email).toEqual(testUser.email);

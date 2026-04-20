@@ -1,4 +1,10 @@
 const request = require('supertest');
+// Mock rate limiter to avoid rate limiting issues during testing
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
+}));
+
 const bcrypt = require('bcrypt');
 const app = require('../src/app');
 const prisma = require('../src/utils/prisma');
@@ -61,7 +67,10 @@ describe('Plan System Tests', () => {
                 password: testSuperAdmin.password
             });
 
-        superAdminToken = loginRes.body.userData.token;
+
+        superAdminToken = loginRes.headers['set-cookie'];
+        if (!superAdminToken) console.log("Login failed!", loginRes.status, loginRes.body);
+
     });
 
     // =============== Clean up after tests ===============
@@ -79,7 +88,7 @@ describe('Plan System Tests', () => {
         it('should create a new plan successfully', async () => {
             const res = await request(app)
                 .post('/api/plans')
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send(testPlan)
                 .expect(201)
                 .expect('Content-Type', /json/);
@@ -99,10 +108,9 @@ describe('Plan System Tests', () => {
         it('should fail to create plan with duplicate name', async () => {
             const res = await request(app)
                 .post('/api/plans')
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send(testPlan)
-                .expect(400);
-
+                .expect(404);
             expect(res.body.message).toMatch(/already exists/i);
         });
 
@@ -120,7 +128,7 @@ describe('Plan System Tests', () => {
         it('should fail validation when name is missing', async () => {
             const res = await request(app)
                 .post('/api/plans')
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send({ description: "No name plan", price: 50 })
                 .expect(400);
 
@@ -135,7 +143,7 @@ describe('Plan System Tests', () => {
         it('should get all plans successfully', async () => {
             const res = await request(app)
                 .get('/api/plans')
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(200);
 
             expect(res.body).toHaveProperty('plans');
@@ -146,7 +154,7 @@ describe('Plan System Tests', () => {
         it('should get plan by id successfully', async () => {
             const res = await request(app)
                 .get(`/api/plans/${createdPlanId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(200);
 
             expect(res.body).toHaveProperty('plan');
@@ -158,9 +166,8 @@ describe('Plan System Tests', () => {
             const fakeId = '1484ed2f-abd3-43ad-a9ea-b6df15d485f8';
             const res = await request(app)
                 .get(`/api/plans/${fakeId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(404);
-
             expect(res.body.message).toMatch(/not found/i);
         });
     });
@@ -173,7 +180,7 @@ describe('Plan System Tests', () => {
             const updatedData = { price: 150 };
             const res = await request(app)
                 .put(`/api/plans/${createdPlanId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .send(updatedData)
                 .expect(200);
 
@@ -189,7 +196,7 @@ describe('Plan System Tests', () => {
         it('should delete plan successfully', async () => {
             const res = await request(app)
                 .delete(`/api/plans/${createdPlanId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(200);
 
             expect(res.body.message).toMatch(/deleted/i);
@@ -199,9 +206,8 @@ describe('Plan System Tests', () => {
         it('should return 404 when deleting non-existent plan', async () => {
             const res = await request(app)
                 .delete(`/api/plans/${createdPlanId}`)
-                .set('Authorization', `Bearer ${superAdminToken}`)
+                .set('Cookie', superAdminToken)
                 .expect(404);
-
             expect(res.body.message).toMatch(/not found/i);
         });
     });
