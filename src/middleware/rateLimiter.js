@@ -8,8 +8,8 @@ const globalLimiter = rateLimit({
     max: 500, // Limit each IP to 500 requests per window
     standardHeaders: true,
     legacyHeaders: false,
-    // Skip login routes — they have their own dedicated authLimiter
-    skip: (req) => req.method === 'POST' && req.originalUrl.endsWith('/login'),
+    // Skip all login routes — they have their own dedicated authLimiter (5 mins)
+    skip: (req) => req.method === 'POST' && /\/login(\/)?$/.test(req.originalUrl),
     store: new RedisStore({
         sendCommand: (...args) => redis.call(...args),
     }),
@@ -26,10 +26,10 @@ const globalLimiter = rateLimit({
 });
 
 
-// Auth Rate Limiter (5 requests per 5 minutes)
+// Auth Rate Limiter (10 requests per 5 minutes)
 const authLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 5, // Limit each IP to 5 requests per window
+    max: 10, // Limit each IP to 10 requests per window
     standardHeaders: true,
     legacyHeaders: false,
     store: new RedisStore({
