@@ -30,6 +30,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
 
 // Routes 
+app.use('/api/health', require('./routes/health'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/plans', require('./routes/planRoutes'));
 app.use('/api/schools', require('./routes/schoolsRoutes'));
