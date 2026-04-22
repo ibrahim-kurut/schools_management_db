@@ -5,7 +5,6 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
@@ -15,25 +14,25 @@ jest.mock('../src/config/redis', () => ({
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         subject: {
             create: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            deleteMany: jest.fn(),
+            findFirst: jest.fn(),
         },
-        school: {
-            findUnique: jest.fn(),
-        },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        class: { findFirst: jest.fn(), findUnique: jest.fn() },
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
+
+const prisma = require('../src/utils/prisma');
 
 describe('Subject Management Unit Tests (Mocked)', () => {
     beforeEach(() => {
@@ -42,15 +41,26 @@ describe('Subject Management Unit Tests (Mocked)', () => {
 
     describe('POST /api/subjects', () => {
         it('should create a new subject', async () => {
-            const subjectData = { name: "Mathematics", code: "MATH101" };
-            prisma.subject.create.mockResolvedValue({ id: "sub-1", ...subjectData, schoolId: 'school-1' });
+            const subjectData = { 
+                name: "Mathematics", 
+                classId: "550e8400-e29b-41d4-a716-446655440000" 
+            };
+            
+            prisma.class.findFirst.mockResolvedValue({ id: subjectData.classId });
+            prisma.subject.findFirst.mockResolvedValue(null);
+            prisma.subject.create.mockResolvedValue({ 
+                id: "sub-1", 
+                ...subjectData,
+                class: { name: "Grade 10" },
+                teacher: null
+            });
 
             const res = await request(app)
                 .post('/api/subjects')
                 .send(subjectData)
                 .expect(201);
 
-            expect(res.body.subject.name).toBe(subjectData.name);
+            expect(res.body.newSubject.name).toBe(subjectData.name);
         });
     });
 });

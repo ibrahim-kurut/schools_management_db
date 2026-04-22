@@ -5,55 +5,85 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    delByPattern: jest.fn(),
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Mock gradeCalculations
+jest.mock('../src/services/gradeCalculations', () => ({
+    calculateAveragesIfNeeded: jest.fn().mockResolvedValue(true)
+}));
+
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         grade: {
             create: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            deleteMany: jest.fn(),
+            findFirst: jest.fn(),
         },
-        user: { findUnique: jest.fn() },
-        subject: { findUnique: jest.fn() },
-        academicYear: { findUnique: jest.fn() },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        user: { findFirst: jest.fn(), findUnique: jest.fn() },
+        subject: { findFirst: jest.fn(), findUnique: jest.fn() },
+        academicYear: { findFirst: jest.fn(), findUnique: jest.fn() },
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
 
+const prisma = require('../src/utils/prisma');
+
 describe('Grades Management Unit Tests (Mocked)', () => {
+    const studentId = "550e8400-e29b-41d4-a716-446655440000";
+    const subjectId = "550e8400-e29b-41d4-a716-446655440001";
+    const academicYearId = "550e8400-e29b-41d4-a716-446655440002";
+    const classId = "550e8400-e29b-41d4-a716-446655440003";
+
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     describe('POST /api/grades', () => {
         it('should record a grade successfully', async () => {
-            const gradeData = { studentId: "stud-1", subjectId: "sub-1", score: 85, academicYearId: "year-1" };
-            prisma.grade.create.mockResolvedValue({ id: "grade-1", ...gradeData });
-            prisma.user.findUnique.mockResolvedValue({ id: "stud-1", role: "STUDENT" });
-            prisma.subject.findUnique.mockResolvedValue({ id: "sub-1" });
-            prisma.academicYear.findUnique.mockResolvedValue({ id: "year-1" });
+            const gradeData = {
+                studentId,
+                subjectId,
+                academicYearId,
+                examType: "OCTOBER",
+                score: 85
+            };
+
+            prisma.academicYear.findFirst.mockResolvedValue({ id: academicYearId });
+            prisma.subject.findFirst.mockResolvedValue({ 
+                id: subjectId, 
+                class: { id: classId },
+                teacherId: "teacher-id"
+            });
+            prisma.user.findFirst.mockResolvedValue({ id: studentId, classId: classId });
+            
+            prisma.grade.create.mockResolvedValue({ 
+                id: "grade-1", 
+                ...gradeData,
+                student: { firstName: "S", lastName: "T" },
+                subject: { name: "Sub" },
+                academicYear: { name: "Year" }
+            });
 
             const res = await request(app)
                 .post('/api/grades')
                 .send(gradeData)
                 .expect(201);
 
-            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.success).toBe(true);
         });
     });
 });

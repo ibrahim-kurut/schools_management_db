@@ -5,7 +5,6 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
@@ -15,47 +14,52 @@ jest.mock('../src/config/redis', () => ({
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         note: {
             create: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            deleteMany: jest.fn(),
         },
         subject: {
             findFirst: jest.fn(),
         },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
 
-describe('Note System Unit Tests (Mocked)', () => {
+const prisma = require('../src/utils/prisma');
+
+describe('Notes System Unit Tests (Mocked)', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     describe('POST /api/notes', () => {
-        it('should create a note', async () => {
-            const validUuid = "550e8400-e29b-41d4-a716-446655440000";
-            const noteData = { content: "Hello World", classId: validUuid };
+        it('should create a new note', async () => {
+            const noteData = { 
+                classId: "550e8400-e29b-41d4-a716-446655440000", 
+                content: "Good progress" 
+            };
             
             prisma.subject.findFirst.mockResolvedValue({ id: "sub-1" });
-            prisma.note.create.mockResolvedValue({ id: "1", ...noteData, teacherId: 'user-1' });
+            prisma.note.create.mockResolvedValue({ 
+                id: "note-1", 
+                ...noteData,
+                teacher: { firstName: "Teacher", lastName: "Test", image: null }
+            });
 
             const res = await request(app)
                 .post('/api/notes')
-                .send(noteData);
-            
-            if (res.status !== 201) console.log('DEBUG Error:', res.body);
-            expect(res.status).toBe(201);
+                .send(noteData)
+                .expect(201);
 
-            expect(res.body.data.content).toBe(noteData.content);
+            expect(res.body.success).toBe(true);
         });
     });
 });

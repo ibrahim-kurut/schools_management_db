@@ -5,25 +5,24 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    delByPattern: jest.fn(),
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         payment: {
             aggregate: jest.fn(),
             findMany: jest.fn(),
             create: jest.fn(),
             findUnique: jest.fn(),
-            findFirst: jest.fn(),
             update: jest.fn(),
             deleteMany: jest.fn(),
         },
@@ -32,31 +31,28 @@ jest.mock('../src/utils/prisma', () => {
             findFirst: jest.fn(),
             create: jest.fn(),
             deleteMany: jest.fn(),
+            count: jest.fn(),
         },
         school: {
             findUnique: jest.fn(),
             create: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        class: {
-            findUnique: jest.fn(),
-            create: jest.fn(),
-            deleteMany: jest.fn(),
         },
         studentProfile: {
-            create: jest.fn(),
             findUnique: jest.fn(),
-            deleteMany: jest.fn(),
+            upsert: jest.fn(),
         },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
 
+const prisma = require('../src/utils/prisma');
+
 describe('Payment System Unit Tests (Mocked)', () => {
+    const testSchoolId = "test-school-id";
+    const testUserId = "test-user-id";
     const studentId = "550e8400-e29b-41d4-a716-446655440002";
-    const schoolId = "550e8400-e29b-41d4-a716-446655440003";
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -64,8 +60,16 @@ describe('Payment System Unit Tests (Mocked)', () => {
 
     describe('POST /api/payments', () => {
         it('should create a payment successfully', async () => {
-            prisma.user.findUnique.mockResolvedValue({ id: studentId, schoolId: schoolId });
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId, slug: 'test' });
+            prisma.user.findFirst.mockResolvedValue({ 
+                id: studentId, 
+                schoolId: testSchoolId,
+                role: "STUDENT",
+                school: { slug: "test" },
+                class: { tuitionFee: 1000 },
+                studentProfile: { discountAmount: 0 },
+                paymentsMade: []
+            });
+            prisma.user.findUnique.mockResolvedValue({ id: testUserId, firstName: "Admin", lastName: "User" });
             prisma.payment.create.mockResolvedValue({
                 id: 1,
                 amount: 500,
@@ -90,15 +94,21 @@ describe('Payment System Unit Tests (Mocked)', () => {
 
     describe('GET /api/payments/financial-record/:studentId', () => {
         it('should return financial record', async () => {
-            prisma.user.findUnique.mockResolvedValue({ 
-                id: studentId, 
-                schoolId: schoolId, 
-                class: { tuitionFee: 2000 } 
+            prisma.user.findUnique.mockImplementation(({ where }) => {
+                if (where.id === studentId) {
+                    return Promise.resolve({
+                        id: studentId,
+                        schoolId: testSchoolId,
+                        role: "STUDENT",
+                        firstName: "Student",
+                        lastName: "Test",
+                        class: { tuitionFee: 2000 },
+                        studentProfile: { discountAmount: 100 },
+                        paymentsMade: []
+                    });
+                }
+                return Promise.resolve({ id: testUserId, schoolId: testSchoolId, role: "SUPER_ADMIN" });
             });
-            prisma.payment.findMany.mockResolvedValue([
-                { amount: 500, paymentType: "TUITION" }
-            ]);
-            prisma.studentProfile.findUnique.mockResolvedValue({ discountAmount: 100 });
 
             const res = await request(app)
                 .get(`/api/payments/financial-record/${studentId}`)

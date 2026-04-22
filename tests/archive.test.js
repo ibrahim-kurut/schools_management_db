@@ -5,35 +5,53 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
-// Mock Prisma
-jest.mock('../src/utils/prisma', () => ({
-    academicYear: {
-        findUnique: jest.fn(),
-        update: jest.fn(),
-    },
-    $disconnect: jest.fn()
+// Mock Redis
+jest.mock('../src/config/redis', () => ({
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    quit: jest.fn(),
 }));
 
-describe('Archive System Unit Tests (Mocked)', () => {
-    const superToken = ['cookie=mock-super-token'];
+// Robust Prisma Mock
+jest.mock('../src/utils/prisma', () => {
+    const mock = {
+        academicYear: {
+            findUnique: jest.fn(),
+            update: jest.fn(),
+            findFirst: jest.fn(),
+        },
+        class: { findFirst: jest.fn() },
+        subject: { findFirst: jest.fn() },
+        $transaction: jest.fn((callback) => callback(mock)),
+        $disconnect: jest.fn()
+    };
+    return mock;
+});
 
+const prisma = require('../src/utils/prisma');
+
+describe('Archive System Unit Tests (Mocked)', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe('POST /api/archive/academic-year/:id', () => {
-        it('should archive an academic year', async () => {
-            prisma.academicYear.findUnique.mockResolvedValue({ id: "1", isArchived: false });
-            prisma.academicYear.update.mockResolvedValue({ id: "1", isArchived: true });
+    describe('POST /api/archive/restore', () => {
+        it('should restore an academic year', async () => {
+            // First call finds the archived year
+            prisma.academicYear.findFirst.mockResolvedValueOnce({ id: "year-1", isArchived: true, name: "2024_deleted_123" });
+            // Second call checks for conflict (should be null)
+            prisma.academicYear.findFirst.mockResolvedValueOnce(null);
+            
+            prisma.academicYear.update.mockResolvedValue({ id: "year-1", isArchived: false, name: "2024" });
 
             const res = await request(app)
-                .post('/api/archive/academic-year/1')
-                .set('Cookie', superToken)
+                .post('/api/archive/restore')
+                .send({ type: 'academicYear', id: 'year-1' })
                 .expect(200);
 
-            expect(res.body.success).toBe(true);
+            expect(res.body.status).toBe("SUCCESS");
         });
     });
 });

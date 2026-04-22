@@ -5,36 +5,48 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
-// Mock Prisma
-jest.mock('../src/utils/prisma', () => ({
-    notification: {
-        create: jest.fn(),
-        findMany: jest.fn(),
-        updateMany: jest.fn(),
-        deleteMany: jest.fn(),
-    },
-    $disconnect: jest.fn()
+// Mock Redis
+jest.mock('../src/config/redis', () => ({
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    quit: jest.fn(),
 }));
 
-describe('Notification System Unit Tests (Mocked)', () => {
-    const userToken = ['cookie=mock-user-token'];
+// Robust Prisma Mock
+jest.mock('../src/utils/prisma', () => {
+    const mock = {
+        notification: {
+            findMany: jest.fn(),
+            update: jest.fn(),
+            updateMany: jest.fn(),
+            create: jest.fn(),
+        },
+        $transaction: jest.fn((callback) => callback(mock)),
+        $disconnect: jest.fn()
+    };
+    return mock;
+});
 
+const prisma = require('../src/utils/prisma');
+
+describe('Notification System Unit Tests (Mocked)', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     describe('GET /api/notifications', () => {
         it('should fetch notifications', async () => {
-            prisma.notification.findMany.mockResolvedValue([{ id: "1", message: "Hello" }]);
+            prisma.notification.findMany.mockResolvedValue([
+                { id: "notif-1", title: "Test", message: "Hello", isRead: false }
+            ]);
 
             const res = await request(app)
                 .get('/api/notifications')
-                .set('Cookie', userToken)
                 .expect(200);
 
-            expect(res.body.notifications.length).toBe(1);
+            expect(res.body.data.length).toBe(1);
         });
     });
 });

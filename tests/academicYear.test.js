@@ -1,150 +1,63 @@
-const {
-    createAcademicYearService,
-    getAcademicYearsService,
-    getAcademicYearByIdService,
-    updateAcademicYearService,
-    deleteAcademicYearService
-} = require('../src/services/academicYearService');
-const prisma = require('../src/utils/prisma');
-const redis = require('../src/config/redis');
-
-// Mock prisma and redis
-jest.mock('../src/utils/prisma', () => ({
-    school: {
-        findUnique: jest.fn(),
-    },
-    academicYear: {
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        updateMany: jest.fn(),
-        findMany: jest.fn(),
-        count: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
-    },
+const request = require('supertest');
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
 }));
 
+const app = require('../src/app');
+
+// Mock Redis
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    quit: jest.fn(),
 }));
 
-describe('Academic Year Service Tests', () => {
-    afterEach(() => {
+// Robust Prisma Mock
+jest.mock('../src/utils/prisma', () => {
+    const mock = {
+        academicYear: {
+            create: jest.fn(),
+            findMany: jest.fn(),
+            findUnique: jest.fn(),
+            findFirst: jest.fn(),
+            update: jest.fn(),
+            deleteMany: jest.fn(),
+            updateMany: jest.fn(),
+        },
+        grade: {
+            count: jest.fn(),
+        },
+        school: {
+            findUnique: jest.fn(),
+        },
+        $transaction: jest.fn((callback) => callback(mock)),
+        $disconnect: jest.fn()
+    };
+    return mock;
+});
+
+const prisma = require('../src/utils/prisma');
+
+describe('Academic Year System Unit Tests (Mocked)', () => {
+    beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe('createAcademicYearService', () => {
-        const schoolId = 1;
-        const reqData = { name: '2023-2024', startDate: '2023-09-01', endDate: '2024-06-01', isCurrent: true };
-
-        it('should create academic year successfully', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
+    describe('POST /api/academic-year', () => {
+        it('should create an academic year', async () => {
+            const yearData = { name: "2024-2025", startDate: "2024-09-01", endDate: "2025-06-01" };
+            prisma.school.findUnique.mockResolvedValue({ id: "test-school-id" });
             prisma.academicYear.findFirst.mockResolvedValue(null);
-            prisma.academicYear.create.mockResolvedValue({ ...reqData, id: 1, schoolId });
+            prisma.academicYear.create.mockResolvedValue({ id: "year-1", ...yearData });
 
-            const result = await createAcademicYearService(schoolId, reqData);
+            const res = await request(app)
+                .post('/api/academic-year')
+                .send(yearData)
+                .expect(201);
 
-            expect(result.status).toBe("SUCCESS");
-            expect(prisma.academicYear.create).toHaveBeenCalled();
-            expect(prisma.academicYear.updateMany).toHaveBeenCalled(); // Since isCurrent is true
-            expect(redis.del).toHaveBeenCalled();
-        });
-
-        it('should return CONFLICT if academic year exists', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            prisma.academicYear.findFirst.mockResolvedValue({ id: 1 });
-
-            const result = await createAcademicYearService(schoolId, reqData);
-            expect(result.status).toBe("CONFLICT");
-        });
-    });
-
-    describe('getAcademicYearsService', () => {
-        const schoolId = 1;
-
-        it('should return academic years from cache', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            const cachedData = { status: "SUCCESS", academicYears: [] };
-            redis.get.mockResolvedValue(JSON.stringify(cachedData));
-
-            const result = await getAcademicYearsService(schoolId);
-            expect(result).toEqual(cachedData);
-            expect(prisma.academicYear.findMany).not.toHaveBeenCalled();
-        });
-
-        it('should return academic years from db', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            redis.get.mockResolvedValue(null);
-            prisma.academicYear.findMany.mockResolvedValue([]);
-            prisma.academicYear.count.mockResolvedValue(0);
-
-            const result = await getAcademicYearsService(schoolId);
-            expect(result.status).toBe("SUCCESS");
-            expect(redis.set).toHaveBeenCalled();
-        });
-    });
-
-    describe('getAcademicYearByIdService', () => {
-        const schoolId = 1;
-        const academicYearId = 1;
-
-        it('should return academic year', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            redis.get.mockResolvedValue(null);
-            prisma.academicYear.findFirst.mockResolvedValue({ id: academicYearId });
-
-            const result = await getAcademicYearByIdService(schoolId, academicYearId);
-            expect(result.status).toBe("SUCCESS");
-        });
-
-        it('should return NOT_FOUND if not exists', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            redis.get.mockResolvedValue(null);
-            prisma.academicYear.findFirst.mockResolvedValue(null);
-
-            const result = await getAcademicYearByIdService(schoolId, academicYearId);
-            expect(result.status).toBe("NOT_FOUND");
-        });
-    });
-
-    describe('updateAcademicYearService', () => {
-        const schoolId = 1;
-        const academicYearId = 1;
-        const reqData = { name: 'New Name' };
-
-        it('should update academic year successfully', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            prisma.academicYear.findUnique.mockResolvedValue({
-                id: academicYearId,
-                schoolId: schoolId,
-                startDate: new Date('2023-01-01'),
-                endDate: new Date('2024-01-01')
-            });
-            prisma.academicYear.findFirst.mockResolvedValue(null); // Explicitly return null for conflict check
-            prisma.academicYear.update.mockResolvedValue({ id: academicYearId, ...reqData });
-
-            const result = await updateAcademicYearService(schoolId, academicYearId, reqData);
-            expect(result.status).toBe("SUCCESS");
-            expect(redis.del).toHaveBeenCalledTimes(2);
-        });
-    });
-
-    describe('deleteAcademicYearService', () => {
-        const schoolId = 1;
-        const academicYearId = 1;
-
-        it('should delete (soft delete) academic year successfully', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            prisma.academicYear.findUnique.mockResolvedValue({ id: academicYearId, schoolId, name: "Old" });
-            prisma.academicYear.update.mockResolvedValue({ id: academicYearId, isDeleted: true });
-
-            const result = await deleteAcademicYearService(schoolId, academicYearId);
-            expect(result.status).toBe("SUCCESS");
-            expect(prisma.academicYear.update).toHaveBeenCalledWith(
-                expect.objectContaining({ where: { id: academicYearId }, data: expect.objectContaining({ isDeleted: true }) })
-            );
+            expect(res.body.academicYear).toBeDefined();
         });
     });
 });

@@ -5,7 +5,6 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
@@ -15,25 +14,27 @@ jest.mock('../src/config/redis', () => ({
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         class: {
             create: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            deleteMany: jest.fn(),
-            count: jest.fn(),
+            findFirst: jest.fn(),
         },
-        school: { findUnique: jest.fn() },
-        user: { findMany: jest.fn() },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        school: {
+            findUnique: jest.fn(),
+        },
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
+
+const prisma = require('../src/utils/prisma');
 
 describe('Class System Unit Tests (Mocked)', () => {
     beforeEach(() => {
@@ -42,15 +43,21 @@ describe('Class System Unit Tests (Mocked)', () => {
 
     describe('POST /api/classes', () => {
         it('should create a new class', async () => {
-            const classData = { name: "Grade 10A", tuitionFee: 1000 };
-            prisma.class.create.mockResolvedValue({ id: "class-1", ...classData, schoolId: 'school-1' });
+            const classData = { name: "Grade 10A", tuitionFee: 500000 };
+            prisma.school.findUnique.mockResolvedValue({ id: "test-school-id" });
+            prisma.class.findFirst.mockResolvedValue(null);
+            prisma.class.create.mockResolvedValue({ 
+                id: "class-1", 
+                ...classData,
+                _count: { students: 0 }
+            });
 
             const res = await request(app)
                 .post('/api/classes')
                 .send(classData)
                 .expect(201);
 
-            expect(res.body.status).toBe("SUCCESS");
+            expect(res.body.class).toBeDefined();
         });
     });
 });

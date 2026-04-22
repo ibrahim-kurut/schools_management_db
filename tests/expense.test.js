@@ -5,19 +5,19 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    delByPattern: jest.fn(),
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         expense: {
             create: jest.fn(),
             findMany: jest.fn(),
@@ -28,11 +28,16 @@ jest.mock('../src/utils/prisma', () => {
             createMany: jest.fn(),
             deleteMany: jest.fn(),
         },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        user: {
+            findUnique: jest.fn(),
+        },
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
+
+const prisma = require('../src/utils/prisma');
 
 describe('Expense System Unit Tests (Mocked)', () => {
     beforeEach(() => {
@@ -41,14 +46,15 @@ describe('Expense System Unit Tests (Mocked)', () => {
 
     describe('POST /api/expenses', () => {
         it('should create an expense successfully', async () => {
+            const expenseData = { title: "Stationery", amount: 150, type: "SUPPLIES" };
+            
+            prisma.user.findUnique.mockResolvedValue({ id: "test-user-id", role: "SCHOOL_ADMIN" });
             prisma.expense.create.mockResolvedValue({
                 id: 1,
-                title: "Stationery",
-                amount: 150,
-                type: "SUPPLIES"
+                ...expenseData,
+                recipient: null,
+                recordedBy: { firstName: "Admin", lastName: "User" }
             });
-
-            const expenseData = { title: "Stationery", amount: 150, type: "SUPPLIES" };
 
             const res = await request(app)
                 .post('/api/expenses')

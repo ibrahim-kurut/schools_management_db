@@ -5,7 +5,6 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
@@ -15,22 +14,23 @@ jest.mock('../src/config/redis', () => ({
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         plan: {
             create: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            deleteMany: jest.fn(),
         },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
+
+const prisma = require('../src/utils/prisma');
 
 describe('Plan System Unit Tests (Mocked)', () => {
     beforeEach(() => {
@@ -39,7 +39,15 @@ describe('Plan System Unit Tests (Mocked)', () => {
 
     describe('POST /api/plans', () => {
         it('should create a new plan successfully', async () => {
-            const testPlan = { name: "Pro Plan", price: 99, durationInDays: 30 };
+            const testPlan = {
+                name: "Premium",
+                price: 100,
+                durationInDays: 30,
+                maxStudents: 500,
+                bufferStudents: 50,
+                description: "Full features"
+            };
+
             prisma.plan.create.mockResolvedValue({ id: "plan-1", ...testPlan });
 
             const res = await request(app)
@@ -47,7 +55,7 @@ describe('Plan System Unit Tests (Mocked)', () => {
                 .send(testPlan)
                 .expect(201);
 
-            expect(res.body.plan.name).toBe(testPlan.name);
+            expect(res.body.data.name).toBe(testPlan.name);
         });
     });
 });

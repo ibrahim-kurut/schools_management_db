@@ -5,7 +5,6 @@ jest.mock('../src/middleware/rateLimiter', () => ({
 }));
 
 const app = require('../src/app');
-const prisma = require('../src/utils/prisma');
 
 // Mock Redis
 jest.mock('../src/config/redis', () => ({
@@ -15,45 +14,58 @@ jest.mock('../src/config/redis', () => ({
     quit: jest.fn(),
 }));
 
-// Mock Prisma
+// Mock Notification Service
+jest.mock('../src/services/notificationService', () => ({
+    createNotificationService: jest.fn().mockResolvedValue(true)
+}));
+
+// Robust Prisma Mock
 jest.mock('../src/utils/prisma', () => {
-    const mockPrisma = {
+    const mock = {
         subscriptionRequest: {
             create: jest.fn(),
             findMany: jest.fn(),
-            count: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
-            deleteMany: jest.fn(),
+            delete: jest.fn(),
             findFirst: jest.fn(),
         },
-        subscription: {
-            findUnique: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        plan: {
-            findUnique: jest.fn(),
-        },
-        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        school: { findUnique: jest.fn() },
+        plan: { findUnique: jest.fn() },
+        user: { findMany: jest.fn() },
+        $transaction: jest.fn((callback) => callback(mock)),
         $disconnect: jest.fn()
     };
-    return mockPrisma;
+    return mock;
 });
 
+const prisma = require('../src/utils/prisma');
+
 describe('Subscription System Unit Tests (Mocked)', () => {
+    const planId = "550e8400-e29b-41d4-a716-446655440000";
+
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     describe('POST /api/subscriptions/request', () => {
-        it('should create a subscription request successfully', async () => {
-            const planId = "550e8400-e29b-41d4-a716-446655440001";
+        it('should create a subscription request', async () => {
+            const requestData = { planId };
+            
+            prisma.school.findUnique.mockResolvedValue({ id: "school-1", name: "Test School" });
+            prisma.plan.findUnique.mockResolvedValue({ id: planId, name: "Basic Plan" });
             prisma.subscriptionRequest.findFirst.mockResolvedValue(null);
-            prisma.subscriptionRequest.create.mockResolvedValue({ id: "req-1", status: "PENDING" });
+            prisma.user.findMany.mockResolvedValue([]); 
+            
+            prisma.subscriptionRequest.create.mockResolvedValue({ 
+                id: "req-1", 
+                planId,
+                plan: { name: "Basic Plan", price: 100, durationInDays: 30 }
+            });
 
             const res = await request(app)
                 .post('/api/subscriptions/request')
-                .send({ planId: planId, paymentReceipt: "receipt-url" })
+                .send(requestData)
                 .expect(201);
 
             expect(res.body.success).toBe(true);
