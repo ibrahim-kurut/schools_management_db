@@ -56,16 +56,13 @@ describe('Subscription System Tests', () => {
 
     // =============== Setup before tests ===============
     beforeAll(async () => {
-        // 1. Clean up
+        // 1. Clean up everything
         await prisma.subscriptionRequest.deleteMany({});
         await prisma.subscription.deleteMany({});
-        await prisma.school.deleteMany({ where: { slug: testSchool.slug } });
-        await prisma.user.deleteMany({
-            where: {
-                email: { in: [testSuperAdmin.email, testSchoolOwner.email] }
-            }
-        });
-        await prisma.plan.deleteMany({ where: { name: testPlan.name } });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
+        await prisma.plan.deleteMany({});
         await redis.flushall();
 
         // 2. Create Super Admin
@@ -108,9 +105,15 @@ describe('Subscription System Tests', () => {
             password: testSchoolOwner.password
         });
         schoolAdminToken = ownerLogin.headers['set-cookie'];
-    });
+    }, 30000);
 
     afterAll(async () => {
+        await prisma.subscriptionRequest.deleteMany({});
+        await prisma.subscription.deleteMany({});
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
+        await prisma.plan.deleteMany({});
         await prisma.$disconnect();
         await redis.quit();
     });

@@ -14,16 +14,22 @@ describe('Expense Management System Tests', () => {
     let teacherId, studentId, otherSchoolId;
 
     beforeAll(async () => {
+        // Cleanup everything before starting
+        await prisma.expense.deleteMany({});
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
+
         // 1. Setup Schools
         const school = await prisma.school.create({
             data: {
-                name: "Expense Test School",
-                slug: "expense-test-school",
+                name: "Expense Test School Unique",
+                slug: "expense-test-school-unique",
                 owner: {
                     create: {
                         firstName: "Admin",
                         lastName: "Expense",
-                        email: "admin@expense.com",
+                        email: "admin@expense-unique.com",
                         password: "hash",
                         gender: "FEMALE",
                         birthDate: new Date(),
@@ -36,13 +42,13 @@ describe('Expense Management System Tests', () => {
 
         const otherSchool = await prisma.school.create({
             data: {
-                name: "Other School",
-                slug: "other-school",
+                name: "Other Expense School",
+                slug: "other-expense-school",
                 owner: {
                     create: {
                         firstName: "Other",
                         lastName: "Admin",
-                        email: "otheradmin@expense.com",
+                        email: "otheradmin@expense-unique.com",
                         password: "hash",
                         gender: "MALE",
                         birthDate: new Date(),
@@ -102,9 +108,11 @@ describe('Expense Management System Tests', () => {
     });
 
     afterAll(async () => {
-        await prisma.expense.deleteMany();
-        await prisma.user.deleteMany();
-        await prisma.school.deleteMany();
+        await prisma.expense.deleteMany({});
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
+        await prisma.$disconnect();
     });
 
     describe('POST /api/expenses', () => {

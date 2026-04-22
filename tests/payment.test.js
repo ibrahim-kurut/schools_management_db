@@ -63,15 +63,15 @@ describe('Payment System Tests', () => {
     let classId;
 
     // Setup
-    beforeAll(async (timeout = 20000) => {
-        // Cleanup
+    beforeAll(async () => {
+        // Correct Deletion Order: Payment -> StudentProfile -> User -> Class -> School
         await prisma.payment.deleteMany({});
         await prisma.studentProfile.deleteMany({});
-        await prisma.user.deleteMany({ where: { email: { in: [accountantUser.email, studentUser.email, otherStudentUser.email] } } });
-        await prisma.class.deleteMany({ where: { schoolId: schoolId } });
-        await prisma.school.deleteMany({ where: { name: { in: [testSchool.name, testSchool2.name] } } });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
 
-        // Create Schools
+        // Create School 1
         const school1 = await prisma.school.create({
             data: {
                 name: testSchool.name,
@@ -91,7 +91,7 @@ describe('Payment System Tests', () => {
         });
         schoolId = school1.id;
 
-        // Create Class with fee
+        // Create Class in School 1
         const testClass = await prisma.class.create({
             data: {
                 name: "Grade 10",
@@ -101,6 +101,7 @@ describe('Payment System Tests', () => {
         });
         classId = testClass.id;
 
+        // Create School 2
         const school2 = await prisma.school.create({
             data: {
                 name: testSchool2.name,
@@ -121,7 +122,7 @@ describe('Payment System Tests', () => {
         otherSchoolId = school2.id;
 
         // Create Accountant in School 1
-        const accountant = await prisma.user.create({
+        await prisma.user.create({
             data: {
                 ...accountantUser,
                 password: await bcrypt.hash(accountantUser.password, 10),
@@ -129,7 +130,7 @@ describe('Payment System Tests', () => {
             }
         });
 
-        // Create Student in School 1 with class
+        // Create Student in School 1
         const student = await prisma.user.create({
             data: {
                 ...studentUser,
@@ -163,7 +164,7 @@ describe('Payment System Tests', () => {
             .send({ email: studentUser.email, password: studentUser.password });
 
         studentToken = logResStudent.headers['set-cookie'];
-    });
+    }, 30000); // Increased timeout for heavy DB operations
 
     beforeEach(async () => {
         await prisma.payment.deleteMany({});
@@ -171,12 +172,11 @@ describe('Payment System Tests', () => {
     });
 
     afterAll(async () => {
-        // Cleanup
         await prisma.payment.deleteMany({});
         await prisma.studentProfile.deleteMany({});
-        await prisma.user.deleteMany({ where: { email: { in: [accountantUser.email, studentUser.email, otherStudentUser.email, "owner_pay_1@example.com", "owner_pay_2@example.com"] } } });
-        await prisma.class.deleteMany({ where: { schoolId: schoolId } });
-        await prisma.school.deleteMany({ where: { name: { in: [testSchool.name, testSchool2.name] } } });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
         await prisma.$disconnect();
     });
 

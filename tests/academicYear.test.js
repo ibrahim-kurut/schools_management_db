@@ -93,7 +93,7 @@ describe('Academic Year Service Tests', () => {
         it('should return academic year', async () => {
             prisma.school.findUnique.mockResolvedValue({ id: schoolId });
             redis.get.mockResolvedValue(null);
-            prisma.academicYear.findUnique.mockResolvedValue({ id: academicYearId });
+            prisma.academicYear.findFirst.mockResolvedValue({ id: academicYearId });
 
             const result = await getAcademicYearByIdService(schoolId, academicYearId);
             expect(result.status).toBe("SUCCESS");
@@ -102,7 +102,7 @@ describe('Academic Year Service Tests', () => {
         it('should return NOT_FOUND if not exists', async () => {
             prisma.school.findUnique.mockResolvedValue({ id: schoolId });
             redis.get.mockResolvedValue(null);
-            prisma.academicYear.findUnique.mockResolvedValue(null);
+            prisma.academicYear.findFirst.mockResolvedValue(null);
 
             const result = await getAcademicYearByIdService(schoolId, academicYearId);
             expect(result.status).toBe("NOT_FOUND");

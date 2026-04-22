@@ -49,10 +49,10 @@ describe('School System Tests', () => {
 
     // =============== Setup before tests ===============
     beforeAll(async () => {
-        // 1. Clean up old data
-        await prisma.school.deleteMany({ where: { name: testSchool.name } });
-        await prisma.user.deleteMany({ where: { email: testSchoolAdmin.email } });
-        await prisma.user.deleteMany({ where: { email: testSuperAdmin.email } });
+        // 1. Clean up everything
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
 
         // 2. Create School Admin directly in the database
         const hashedPassword = await bcrypt.hash(testSchoolAdmin.password, 10);
@@ -101,14 +101,13 @@ describe('School System Tests', () => {
                 password: testSuperAdmin.password
             });
         superAdminToken = loginSuperAdmin.headers['set-cookie'];
-    });
+    }, 30000);
 
     // =============== Clean up after tests ===============
     afterAll(async () => {
-        // Delete test data and close connection
-        await prisma.school.deleteMany({ where: { name: testSchool.name } });
-        await prisma.user.deleteMany({ where: { email: testSchoolAdmin.email } });
-        await prisma.user.deleteMany({ where: { email: testSuperAdmin.email } });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
         await prisma.$disconnect();
     });
 

@@ -23,15 +23,15 @@ describe('Auth System Tests', () => {
 
     // Cleaning before and after tests
     beforeAll(async () => {
-        await prisma.user.deleteMany({
-            where: { email: testUser.email }
-        });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
     });
 
     afterAll(async () => {
-        await prisma.user.deleteMany({
-            where: { email: testUser.email }
-        });
+        await prisma.user.deleteMany({});
+        await prisma.class.deleteMany({});
+        await prisma.school.deleteMany({});
         await prisma.$disconnect();
     });
 
