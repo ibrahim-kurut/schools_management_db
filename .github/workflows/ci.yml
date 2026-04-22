@@ -61,7 +61,7 @@ jobs:
           cache-dependency-path: 'package-lock.json'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Prisma Generate
         run: npx prisma generate
