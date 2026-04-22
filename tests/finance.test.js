@@ -45,8 +45,8 @@ jest.mock('xlsx', () => ({
 }));
 
 describe('Finance Service Tests', () => {
-    const requester = { role: 'SUPER_ADMIN', schoolId: 1 };
-    const schoolId = 1;
+    const schoolId = '550e8400-e29b-41d4-a716-446655440000';
+    const requester = { role: 'SUPER_ADMIN', schoolId: schoolId };
 
     beforeEach(() => {
         jest.clearAllMocks();

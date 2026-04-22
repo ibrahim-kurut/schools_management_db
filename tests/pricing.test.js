@@ -1,5 +1,3 @@
-const PricingService = require('../src/services/pricing.service');
-
 const mockPrisma = {
     subscription: {
         findUnique: jest.fn(),
@@ -13,6 +11,8 @@ const mockPrisma = {
 jest.mock('@prisma/client', () => ({
     PrismaClient: jest.fn(() => mockPrisma)
 }));
+
+const PricingService = require('../src/services/pricing.service');
 
 describe('Pricing Service Tests', () => {
     afterEach(() => {

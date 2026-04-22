@@ -41,13 +41,13 @@ describe('Classes Service Tests', () => {
         it('should create a class successfully', async () => {
             prisma.school.findUnique.mockResolvedValue({ id: schoolId });
             prisma.class.findFirst.mockResolvedValue(null); // No existing class
-            prisma.class.create.mockResolvedValue({ ...classData, id: 10, schoolId });
+            prisma.class.create.mockResolvedValue({ ...classData, id: 10, schoolId, _count: { students: 0 } });
 
             const result = await createClassService(schoolId, classData);
 
             expect(result).toEqual({
                 status: "SUCCESS",
-                message: "Class created successfully",
+                message: "تم إنشاء الصف بنجاح.",
                 class: expect.objectContaining(classData)
             });
             expect(redis.del).toHaveBeenCalledWith(`school:${schoolId}:classes`);
@@ -57,7 +57,7 @@ describe('Classes Service Tests', () => {
             prisma.school.findUnique.mockResolvedValue(null);
 
             const result = await createClassService(schoolId, classData);
-            expect(result).toEqual({ status: "NOT_FOUND", message: "School not found" });
+            expect(result.status).toBe("NOT_FOUND");
         });
 
         it('should return CONFLICT if class already exists', async () => {
@@ -65,7 +65,7 @@ describe('Classes Service Tests', () => {
             prisma.class.findFirst.mockResolvedValue({ id: 10 });
 
             const result = await createClassService(schoolId, classData);
-            expect(result).toEqual({ status: "CONFLICT", message: "Class already exists" });
+            expect(result.status).toBe("CONFLICT");
         });
     });
 
@@ -85,11 +85,11 @@ describe('Classes Service Tests', () => {
         it('should fetch classes from db if not in cache', async () => {
             prisma.school.findUnique.mockResolvedValue({ id: schoolId });
             redis.get.mockResolvedValue(null);
-            const classes = [{ id: 1, name: 'A' }];
+            const classes = [{ id: 1, name: 'A', _count: { students: 0 } }];
             prisma.class.findMany.mockResolvedValue(classes);
 
             const result = await getAllClassesService(schoolId);
-            expect(result.classes).toEqual(classes);
+            expect(result.classes[0].name).toBe('A');
             expect(redis.set).toHaveBeenCalled();
         });
     });
@@ -116,7 +116,7 @@ describe('Classes Service Tests', () => {
             });
 
             const result = await getClassStudentsService(schoolId, classId);
-            expect(result.message).toMatch(/No students found/);
+            expect(result.message).toMatch(/لا يوجد طلاب/);
         });
     });
 

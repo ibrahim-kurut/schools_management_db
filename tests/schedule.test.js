@@ -4,10 +4,7 @@ const {
     deleteScheduleService,
     bulkSyncScheduleService
 } = require('../src/services/scheduleService');
-const prisma = require('../src/utils/prisma');
-const redis = require('../src/config/redis');
-
-jest.mock('../src/utils/prisma', () => ({
+const mockPrisma = {
     class: { findFirst: jest.fn() },
     subject: { findFirst: jest.fn() },
     user: { findFirst: jest.fn() },
@@ -19,11 +16,15 @@ jest.mock('../src/utils/prisma', () => ({
         update: jest.fn(),
         deleteMany: jest.fn(),
     },
-    $transaction: jest.fn(async (cb) => {
-        // Mock $transaction by executing the callback with the mocked prisma client
-        return cb(prisma);
-    }),
-}));
+};
+
+mockPrisma.$transaction = jest.fn(async (cb) => {
+    return cb(mockPrisma);
+});
+
+jest.mock('../src/utils/prisma', () => mockPrisma);
+const prisma = require('../src/utils/prisma');
+const redis = require('../src/config/redis');
 
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
