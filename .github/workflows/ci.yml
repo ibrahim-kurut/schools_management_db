@@ -1,5 +1,5 @@
 name: Backend CI
-# this command used for testing
+# this command used for testing the backend
 on:
   push:
     branches: [ main, master ]
