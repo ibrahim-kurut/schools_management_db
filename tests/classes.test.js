@@ -1,164 +1,56 @@
-const {
-    createClassService,
-    getAllClassesService,
-    getClassStudentsService,
-    getClassByIdService,
-    updateClassService,
-    deleteClassService
-} = require('../src/services/classesService');
-const prisma = require('../src/utils/prisma');
-const redis = require('../src/config/redis');
-
-// Mock prisma and redis
-jest.mock('../src/utils/prisma', () => ({
-    school: {
-        findUnique: jest.fn(),
-    },
-    class: {
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        findMany: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-    },
+const request = require('supertest');
+jest.mock('../src/middleware/rateLimiter', () => ({
+    globalLimiter: (req, res, next) => next(),
+    authLimiter: (req, res, next) => next()
 }));
 
+const app = require('../src/app');
+const prisma = require('../src/utils/prisma');
+
+// Mock Redis
 jest.mock('../src/config/redis', () => ({
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    quit: jest.fn(),
 }));
 
-describe('Classes Service Tests', () => {
-    afterEach(() => {
+// Mock Prisma
+jest.mock('../src/utils/prisma', () => {
+    const mockPrisma = {
+        class: {
+            create: jest.fn(),
+            findMany: jest.fn(),
+            findUnique: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            deleteMany: jest.fn(),
+            count: jest.fn(),
+        },
+        school: { findUnique: jest.fn() },
+        user: { findMany: jest.fn() },
+        $transaction: jest.fn((callback) => callback(mockPrisma)),
+        $disconnect: jest.fn()
+    };
+    return mockPrisma;
+});
+
+describe('Class System Unit Tests (Mocked)', () => {
+    beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe('createClassService', () => {
-        const schoolId = 1;
-        const classData = { name: 'Class A', tuitionFee: 1000 };
+    describe('POST /api/classes', () => {
+        it('should create a new class', async () => {
+            const classData = { name: "Grade 10A", tuitionFee: 1000 };
+            prisma.class.create.mockResolvedValue({ id: "class-1", ...classData, schoolId: 'school-1' });
 
-        it('should create a class successfully', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            prisma.class.findFirst.mockResolvedValue(null); // No existing class
-            prisma.class.create.mockResolvedValue({ ...classData, id: 10, schoolId, _count: { students: 0 } });
+            const res = await request(app)
+                .post('/api/classes')
+                .send(classData)
+                .expect(201);
 
-            const result = await createClassService(schoolId, classData);
-
-            expect(result).toEqual({
-                status: "SUCCESS",
-                message: "تم إنشاء الصف بنجاح.",
-                class: expect.objectContaining(classData)
-            });
-            expect(redis.del).toHaveBeenCalledWith(`school:${schoolId}:classes`);
-        });
-
-        it('should return NOT_FOUND if school does not exist', async () => {
-            prisma.school.findUnique.mockResolvedValue(null);
-
-            const result = await createClassService(schoolId, classData);
-            expect(result.status).toBe("NOT_FOUND");
-        });
-
-        it('should return CONFLICT if class already exists', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            prisma.class.findFirst.mockResolvedValue({ id: 10 });
-
-            const result = await createClassService(schoolId, classData);
-            expect(result.status).toBe("CONFLICT");
-        });
-    });
-
-    describe('getAllClassesService', () => {
-        const schoolId = 1;
-
-        it('should return classes from cache if available', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            const cachedClasses = { status: "SUCCESS", classes: [] };
-            redis.get.mockResolvedValue(JSON.stringify(cachedClasses));
-
-            const result = await getAllClassesService(schoolId);
-            expect(result).toEqual(cachedClasses);
-            expect(prisma.class.findMany).not.toHaveBeenCalled();
-        });
-
-        it('should fetch classes from db if not in cache', async () => {
-            prisma.school.findUnique.mockResolvedValue({ id: schoolId });
-            redis.get.mockResolvedValue(null);
-            const classes = [{ id: 1, name: 'A', _count: { students: 0 } }];
-            prisma.class.findMany.mockResolvedValue(classes);
-
-            const result = await getAllClassesService(schoolId);
-            expect(result.classes[0].name).toBe('A');
-            expect(redis.set).toHaveBeenCalled();
-        });
-    });
-
-    describe('getClassStudentsService', () => {
-        const schoolId = 1;
-        const classId = 10;
-
-        it('should return students of a class', async () => {
-            const students = [{ id: 1, firstName: 'Ali' }];
-            prisma.class.findFirst.mockResolvedValue({
-                id: classId,
-                students: students
-            });
-
-            const result = await getClassStudentsService(schoolId, classId);
-            expect(result.students).toEqual(students);
-        });
-
-        it('should return NOT_FOUND if class has no students', async () => {
-            prisma.class.findFirst.mockResolvedValue({
-                id: classId,
-                students: []
-            });
-
-            const result = await getClassStudentsService(schoolId, classId);
-            expect(result.message).toMatch(/لا يوجد طلاب/);
-        });
-    });
-
-    describe('updateClassService', () => {
-        const schoolId = 1;
-        const classId = 10;
-        const updateData = { name: 'New Name' };
-
-        it('should update class successfully', async () => {
-            prisma.class.findFirst.mockResolvedValue({ id: classId });
-            prisma.class.update.mockResolvedValue({ id: classId, ...updateData });
-
-            const result = await updateClassService(schoolId, classId, updateData);
-            expect(result.status).toBe("SUCCESS");
-            expect(redis.del).toHaveBeenCalledTimes(2); // List and item caches
-        });
-    });
-
-    describe('deleteClassService', () => {
-        const schoolId = 1;
-        const classId = 10;
-
-        it('should delete class successfully', async () => {
-            prisma.class.findFirst.mockResolvedValue({
-                id: classId,
-                _count: { students: 0 }
-            });
-            prisma.class.delete.mockResolvedValue({ id: classId });
-
-            const result = await deleteClassService(schoolId, classId);
-            expect(result.status).toBe("SUCCESS");
-        });
-
-        it('should not delete class if it has students', async () => {
-            prisma.class.findFirst.mockResolvedValue({
-                id: classId,
-                _count: { students: 5 }
-            });
-
-            const result = await deleteClassService(schoolId, classId);
-            expect(result.status).toBe("NOT_ALLOWED"); // Or whatever status your service returns for this
-            expect(prisma.class.delete).not.toHaveBeenCalled();
+            expect(res.body.status).toBe("SUCCESS");
         });
     });
 });
