@@ -9,8 +9,38 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Pre-route Middlewares
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',') 
+    : ['http://localhost:3000', 'http://localhost:5173'];
+
 app.use(cors({
-    origin: 'http://localhost:3000', // Update this to your production URL when ready
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        
+        const isExplicitlyAllowed = allowedOrigins.includes(origin);
+        const isVercelDomain = origin.endsWith('.vercel.app');
+
+        // Logic based on environment:
+        // 1. In Production: Be strict, only allow origins in ALLOWED_ORIGINS
+        if (process.env.NODE_ENV === 'production') {
+            if (isExplicitlyAllowed) {
+                callback(null, true);
+            } else {
+                console.warn(`CORS blocked production request from: ${origin}`);
+                callback(new Error('Not allowed by CORS in Production'));
+            }
+        } 
+        // 2. In Staging/Development: Be flexible, allow explicit origins + any Vercel domain
+        else {
+            if (isExplicitlyAllowed || isVercelDomain) {
+                callback(null, true);
+            } else {
+                console.warn(`CORS blocked staging/dev request from: ${origin}`);
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     credentials: true,
     exposedHeaders: ["Retry-After"]
 }));
