@@ -16,8 +16,10 @@ const errorHandler = (err, req, res, next) => {
 
     res.status(statusCode).json({
         status: "ERROR",
-        message: err.message, // Show real error message for debugging
-        ...(isProd ? { dev_note: "Disable this after debugging" } : { stack: err.stack })
+        message: isProd
+            ? "حدث خطأ داخلي في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
+            : err.message,
+        ...(isProd ? {} : { stack: err.stack })
     });
 };
 
