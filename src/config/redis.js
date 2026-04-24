@@ -1,11 +1,26 @@
 const Redis = require('ioredis');
 
 // Connection setup 
-// We use the service name "redis" as defined in docker-compose
-const redis = new Redis({
-    host: process.env.REDIS_HOST || 'localhost', // 'redis' if running in docker network
+// Support both REDIS_URL (common in cloud like Upstash) or host/port
+const redisOptions = {
+    host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || 6379,
-});
+    password: process.env.REDIS_PASSWORD,
+};
+
+// If we are in production or using a cloud provider like Upstash, 
+// we likely need TLS. ioredis enables TLS if we provide the 'tls' object.
+if (process.env.REDIS_URL && process.env.REDIS_URL.startsWith('rediss://')) {
+    // rediss:// protocol automatically enables TLS in ioredis
+} else if (process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true') {
+    redisOptions.tls = {
+        rejectUnauthorized: false // Often needed for cloud providers
+    };
+}
+
+const redis = process.env.REDIS_URL 
+    ? new Redis(process.env.REDIS_URL, { tls: process.env.REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined })
+    : new Redis(redisOptions);
 
 redis.on('connect', () => {
     console.log('✅ Connected to Redis successfully');

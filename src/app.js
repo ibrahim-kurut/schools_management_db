@@ -9,8 +9,28 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Pre-route Middlewares
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',') 
+    : ['http://localhost:3000', 'http://localhost:5173'];
+
 app.use(cors({
-    origin: 'http://localhost:3000', // Update this to your production URL when ready
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+
+        // Check if origin is explicitly allowed
+        const isExplicitlyAllowed = allowedOrigins.includes(origin);
+        
+        // Dynamically allow any vercel preview deployments
+        const isVercelPreview = origin.endsWith('.vercel.app');
+
+        if (isExplicitlyAllowed || isVercelPreview) {
+            callback(null, true);
+        } else {
+            console.error(`CORS Blocked: ${origin}`);
+            callback(new Error('Not allowed by CORS policy'));
+        }
+    },
     credentials: true,
     exposedHeaders: ["Retry-After"]
 }));
