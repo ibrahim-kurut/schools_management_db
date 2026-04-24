@@ -15,19 +15,19 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        // السماح بالطلبات بدون origin (مثل تطبيقات الموبايل أو curl)
+        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
 
-        // التحقق إذا كان الرابط مسموحاً به صراحة
+        // Check if origin is explicitly allowed
         const isExplicitlyAllowed = allowedOrigins.includes(origin);
         
-        // التحقق إذا كان الرابط يتبع نطاق vercel (حتى لو كان رابط معاينة طويل)
+        // Dynamically allow any vercel preview deployments
         const isVercelPreview = origin.endsWith('.vercel.app');
 
         if (isExplicitlyAllowed || isVercelPreview) {
             callback(null, true);
         } else {
-            console.error(`🚫 CORS Blocked: ${origin}`);
+            console.error(`CORS Blocked: ${origin}`);
             callback(new Error('Not allowed by CORS policy'));
         }
     },
