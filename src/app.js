@@ -15,30 +15,20 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl)
+        // السماح بالطلبات بدون origin (مثل تطبيقات الموبايل أو curl)
         if (!origin) return callback(null, true);
-        
-        const isExplicitlyAllowed = allowedOrigins.includes(origin);
-        const isVercelDomain = origin.endsWith('.vercel.app');
 
-        // Logic based on environment:
-        // 1. In Production: Be strict, only allow origins in ALLOWED_ORIGINS
-        if (process.env.NODE_ENV === 'production') {
-            if (isExplicitlyAllowed) {
-                callback(null, true);
-            } else {
-                console.warn(`CORS blocked production request from: ${origin}`);
-                callback(new Error('Not allowed by CORS in Production'));
-            }
-        } 
-        // 2. In Staging/Development: Be flexible, allow explicit origins + any Vercel domain
-        else {
-            if (isExplicitlyAllowed || isVercelDomain) {
-                callback(null, true);
-            } else {
-                console.warn(`CORS blocked staging/dev request from: ${origin}`);
-                callback(new Error('Not allowed by CORS'));
-            }
+        // التحقق إذا كان الرابط مسموحاً به صراحة
+        const isExplicitlyAllowed = allowedOrigins.includes(origin);
+        
+        // التحقق إذا كان الرابط يتبع نطاق vercel (حتى لو كان رابط معاينة طويل)
+        const isVercelPreview = origin.endsWith('.vercel.app');
+
+        if (isExplicitlyAllowed || isVercelPreview) {
+            callback(null, true);
+        } else {
+            console.error(`🚫 CORS Blocked: ${origin}`);
+            callback(new Error('Not allowed by CORS policy'));
         }
     },
     credentials: true,
