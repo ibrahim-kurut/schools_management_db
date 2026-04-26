@@ -38,6 +38,7 @@ jobs:
 
     env:
       DATABASE_URL: "postgresql://postgres:password@localhost:5432/schools_management_db?schema=public"
+      DIRECT_URL: "postgresql://postgres:password@localhost:5432/schools_management_db?schema=public"
       REDIS_HOST: "localhost"
       REDIS_PORT: "6379"
       PORT: "8000"
