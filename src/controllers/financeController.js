@@ -3,7 +3,8 @@ const {
     getFinanceStatsService,
     getMonthlyFinanceReportService,
     exportMonthlyFinanceReportService,
-    getFinanceDashboardDetailsService
+    getFinanceDashboardDetailsService,
+    getFinanceDashboardSummaryService
 } = require("../services/financeService");
 
 /**
@@ -81,6 +82,24 @@ exports.getFinanceDashboardDetailsController = asyncHandler(async (req, res) => 
     return res.status(200).json({
         status: "SUCCESS",
         message: "Finance dashboard details retrieved successfully",
+        data: result
+    });
+});
+
+/**
+ * @description Get combined finance dashboard summary (stats + chart + operations)
+ * @route GET /api/finance/dashboard-summary/:schoolId
+ * @method GET
+ * @access private (Accountant, School Admin, Super Admin)
+ */
+exports.getFinanceDashboardSummaryController = asyncHandler(async (req, res) => {
+    const { schoolId } = req.params;
+    const { months } = req.query;
+    const result = await getFinanceDashboardSummaryService(req.user, schoolId, months);
+
+    return res.status(200).json({
+        status: "SUCCESS",
+        message: "Finance dashboard summary retrieved successfully",
         data: result
     });
 });

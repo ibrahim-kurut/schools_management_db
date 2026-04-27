@@ -363,3 +363,15 @@ exports.getFinanceDashboardDetailsService = async (requester, schoolId, months =
 
     return result;
 };
+
+exports.getFinanceDashboardSummaryService = async (requester, schoolId, months = 6) => {
+    const [stats, details] = await Promise.all([
+        exports.getFinanceStatsService(requester, schoolId),
+        exports.getFinanceDashboardDetailsService(requester, schoolId, months)
+    ]);
+
+    return {
+        ...stats,
+        ...details
+    };
+};

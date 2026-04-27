@@ -1,7 +1,5 @@
 const supabase = require('../config/supabaseClient');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 const BUCKET = process.env.SUPABASE_BUCKET || 'assets';
 
 /**

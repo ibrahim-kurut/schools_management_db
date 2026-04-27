@@ -5,7 +5,8 @@ const {
     getFinanceStatsController,
     getMonthlyFinanceReportController,
     exportMonthlyFinanceReportController,
-    getFinanceDashboardDetailsController
+    getFinanceDashboardDetailsController,
+    getFinanceDashboardSummaryController
 } = require("../controllers/financeController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 const requireFeature = require("../middleware/checkFeature.middleware");
@@ -19,11 +20,11 @@ router.get(
 );
 
 router.get(
-    "/dashboard/:schoolId",
+    "/dashboard-summary/:schoolId",
     verifyToken,
     authorize(["ACCOUNTANT", "SCHOOL_ADMIN", "SUPER_ADMIN"]),
     requireFeature("hasFinancials"),
-    getFinanceDashboardDetailsController
+    getFinanceDashboardSummaryController
 );
 
 router.get(
