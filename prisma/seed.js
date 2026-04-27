@@ -8,7 +8,7 @@ async function main() {
   console.log('🌱 بدء عملية الـ Seeding...');
 
   // جلب البيانات من ملف .env لضمان المرونة
-  const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@eduflow.com';
+  const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@g.co';
   const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'admin123456';
 
   console.log(`🔍 سيتم استخدام البريد: ${adminEmail}`);
