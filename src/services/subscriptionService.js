@@ -500,3 +500,135 @@ exports.getMyPendingRequestService = async (schoolId) => {
     });
 };
 
+/**
+ * @description Get platform-wide stats for Super Admin dashboard
+ * @returns {Promise<Object>} Statistics overview
+ */
+exports.getPlatformStatsService = async () => {
+    const cacheKey = 'platform-stats-overview';
+    
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
+    const [totalSchools, pendingRequests, activeSubscriptions, recentRequests] = await Promise.all([
+        prisma.school.count({ where: { isDeleted: false } }),
+        prisma.subscriptionRequest.count({ where: { status: "PENDING" } }),
+        prisma.subscription.findMany({
+            where: { status: "ACTIVE" },
+            include: { plan: true }
+        }),
+        prisma.subscriptionRequest.findMany({
+            take: 5,
+            orderBy: { createdAt: "desc" },
+            include: {
+                school: { select: { name: true, logo: true } },
+                plan: { select: { name: true, price: true } }
+            }
+        })
+    ]);
+
+    // Calculate total revenue from active subscriptions (simplified as annual revenue)
+    const totalRevenue = activeSubscriptions.reduce((sum, sub) => sum + (sub.plan.price || 0), 0);
+
+    const stats = {
+        totalSchools,
+        pendingRequests,
+        totalRevenue,
+        recentRequests
+    };
+
+    // Cache for 10 minutes
+    try {
+        await redis.set(cacheKey, JSON.stringify(stats), 'EX', 600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return stats;
+};
+
+/**
+ * @description Get growth stats for charts
+ * @returns {Promise<Object>} Monthly growth and plan distribution
+ */
+exports.getPlatformGrowthStatsService = async () => {
+    const cacheKey = 'platform-growth-stats';
+    
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (err) {
+        console.error("Redis Get Error:", err);
+    }
+
+    // 1. Get all schools and subscriptions to calculate growth
+    const [schools, subscriptions, plans] = await Promise.all([
+        prisma.school.findMany({
+            where: { isDeleted: false },
+            select: { createdAt: true }
+        }),
+        prisma.subscription.findMany({
+            where: { status: "ACTIVE" },
+            include: { plan: { select: { name: true } } }
+        }),
+        prisma.plan.findMany({
+            select: { name: true, id: true }
+        })
+    ]);
+
+    // 2. Process Monthly Growth (Last 6 months)
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = date.toLocaleString('ar-EG', { month: 'short' });
+        months.push({
+            name: monthName,
+            schools: 0,
+            revenue: 0,
+            monthIndex: date.getMonth(),
+            year: date.getFullYear()
+        });
+    }
+
+    schools.forEach(school => {
+        const d = new Date(school.createdAt);
+        const monthData = months.find(m => m.monthIndex === d.getMonth() && m.year === d.getFullYear());
+        if (monthData) monthData.schools++;
+    });
+
+    // 3. Process Plan Distribution
+    const planCounts = {};
+    plans.forEach(p => planCounts[p.name] = 0);
+    
+    subscriptions.forEach(sub => {
+        if (sub.plan && planCounts[sub.plan.name] !== undefined) {
+            planCounts[sub.plan.name]++;
+        }
+    });
+
+    const planDistribution = Object.entries(planCounts).map(([name, count]) => ({
+        name,
+        value: count,
+        percentage: subscriptions.length > 0 ? Math.round((count / subscriptions.length) * 100) : 0
+    }));
+
+    const result = {
+        monthlyGrowth: months.map(({ name, schools, revenue }) => ({ name, schools, revenue })),
+        planDistribution
+    };
+
+    // Cache for 1 hour
+    try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    } catch (err) {
+        console.error("Redis Set Error:", err);
+    }
+
+    return result;
+};
+

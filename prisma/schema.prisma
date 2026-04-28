@@ -586,3 +586,23 @@ model Notification {
   @@index([isRead])
   @@index([createdAt])
 }
+
+// --------------------------------------
+// Platform Management (Super Admin)
+// --------------------------------------
+
+model PlatformReport {
+  id              String   @id @default(uuid())
+  title           String
+  year            Int
+  month           Int?
+  type            String   // e.g., "MONTHLY", "ANNUAL"
+  totalRevenue    Float
+  schoolsCount    Int
+  pendingRequests Int
+  details         Json     // Full snapshot data
+  createdAt       DateTime @default(now())
+
+  @@index([year, month])
+  @@index([type])
+}

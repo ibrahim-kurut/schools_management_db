@@ -9,7 +9,9 @@ const {
     getMyPendingRequestController,
     settleDebtController,
     addDebtController,
-    updateSchoolSubscriptionController
+    updateSchoolSubscriptionController,
+    getPlatformStatsController,
+    getPlatformGrowthStatsController
 } = require("../controllers/subscriptionController");
 const { verifyToken, authorize } = require("../middleware/verifyToken");
 const router = express.Router();
@@ -22,6 +24,12 @@ router.post("/request", verifyToken, authorize("SCHOOL_ADMIN"), createSubscripti
 
 // School Admin: Get my pending request
 router.get("/my-pending-request", verifyToken, authorize("SCHOOL_ADMIN"), getMyPendingRequestController);
+
+// Super Admin: Get platform-wide stats overview
+router.get("/platform-stats", verifyToken, authorize("SUPER_ADMIN"), getPlatformStatsController);
+
+// Super Admin: Get platform growth stats for charts
+router.get("/platform-growth", verifyToken, authorize("SUPER_ADMIN"), getPlatformGrowthStatsController);
 
 // Super Admin: Get pending requests count
 router.get("/requests/count", verifyToken, authorize("SUPER_ADMIN"), getPendingRequestsCountController);

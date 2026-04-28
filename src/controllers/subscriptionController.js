@@ -8,8 +8,12 @@ const {
     getMyPendingRequestService,
     settleDebtService,
     addDebtService,
-    updateSubscriptionBySuperAdminService
+    updateSubscriptionBySuperAdminService,
+    getPlatformStatsService,
+    getPlatformGrowthStatsService
 } = require("../services/subscriptionService");
+
+
 const {
     createSubscriptionRequestSchema,
     approveSubscriptionSchema,
@@ -272,3 +276,32 @@ exports.updateSchoolSubscriptionController = asyncHandler(async (req, res) => {
         data: updatedSubscription
     });
 });
+
+/**
+ * @description Get platform-wide stats (Super Admin)
+ * @route GET /api/subscriptions/platform-stats
+ * @access private (Super Admin only)
+ */
+exports.getPlatformStatsController = asyncHandler(async (req, res) => {
+    const stats = await getPlatformStatsService();
+    res.status(200).json({
+        success: true,
+        message: "Platform stats retrieved successfully",
+        data: stats
+    });
+});
+
+/**
+ * @description Get platform growth stats for charts (Super Admin)
+ * @route GET /api/subscriptions/platform-growth
+ * @access private (Super Admin only)
+ */
+exports.getPlatformGrowthStatsController = asyncHandler(async (req, res) => {
+    const stats = await getPlatformGrowthStatsService();
+    res.status(200).json({
+        success: true,
+        message: "Growth stats retrieved successfully",
+        data: stats
+    });
+});
+
