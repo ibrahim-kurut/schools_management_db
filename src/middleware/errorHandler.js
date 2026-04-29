@@ -14,9 +14,12 @@ const errorHandler = (err, req, res, next) => {
         stack: err.stack,
     });
 
+    // In production, hide the error message ONLY for 500 errors
+    const shouldHideMessage = isProd && statusCode === 500;
+
     res.status(statusCode).json({
         status: "ERROR",
-        message: isProd
+        message: shouldHideMessage
             ? "حدث خطأ داخلي في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
             : err.message,
         ...(isProd ? {} : { stack: err.stack })

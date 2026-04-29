@@ -63,19 +63,25 @@ exports.loginUser = async (email, password) => {
     });
 
     if (!user) {
-        throw new Error("Invalid credentials");
+        const error = new Error("البيانات المدخلة غير صحيحة");
+        error.statusCode = 401;
+        throw error;
     }
 
     // Only SUPER_ADMIN and SCHOOL_ADMIN can use this endpoint
     const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN'];
     if (!allowedRoles.includes(user.role)) {
-        throw new Error("Access denied. Please use school-specific login.");
+        const error = new Error("عذراً، هذا تسجيل الدخول مخصص لإدارة المنصة والمدارس فقط.");
+        error.statusCode = 403;
+        throw error;
     }
 
     const isMatch = await comparePassword(password, user.password);
 
     if (!isMatch) {
-        throw new Error("Invalid credentials");
+        const error = new Error("البيانات المدخلة غير صحيحة");
+        error.statusCode = 401;
+        throw error;
     }
 
     // get school id from token
@@ -107,7 +113,9 @@ exports.loginUserBySchoolSlug = async (slug, identifier, password) => {
     });
 
     if (!school) {
-        throw new Error("School not found");
+        const error = new Error("لم يتم العثور على المدرسة");
+        error.statusCode = 404;
+        throw error;
     }
 
     // 2. Determine search criteria
@@ -129,14 +137,18 @@ exports.loginUserBySchoolSlug = async (slug, identifier, password) => {
     });
 
     if (!user) {
-        throw new Error("Invalid credentials");
+        const error = new Error("البيانات المدخلة غير صحيحة");
+        error.statusCode = 401;
+        throw error;
     }
 
     // 4. Verify password
     const isMatch = await comparePassword(password, user.password);
 
     if (!isMatch) {
-        throw new Error("Invalid credentials");
+        const error = new Error("البيانات المدخلة غير صحيحة");
+        error.statusCode = 401;
+        throw error;
     }
 
     // 5. Generate token
