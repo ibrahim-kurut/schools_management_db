@@ -1,48 +1,83 @@
 const Redis = require('ioredis');
 
-// Connection setup 
-// Support both REDIS_URL (common in cloud like Upstash) or host/port
-const redisOptions = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379,
-    password: process.env.REDIS_PASSWORD,
-};
-
-// If we are in production or using a cloud provider like Upstash, 
-// we likely need TLS. ioredis enables TLS if we provide the 'tls' object.
-if (process.env.REDIS_URL && process.env.REDIS_URL.startsWith('rediss://')) {
-    // rediss:// protocol automatically enables TLS in ioredis
-} else if (process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true') {
-    redisOptions.tls = {
-        rejectUnauthorized: false // Often needed for cloud providers
-    };
-}
-
-const redis = process.env.REDIS_URL 
-    ? new Redis(process.env.REDIS_URL, { tls: process.env.REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined })
-    : new Redis(redisOptions);
-
-redis.on('connect', () => {
-    console.log('✅ Connected to Redis successfully');
-});
-
-redis.on('error', (err) => {
-    console.error('❌ Redis connection error:', err);
-});
+// ── Determine whether Redis is explicitly configured ──
+const hasRedisConfig = !!(process.env.REDIS_URL || process.env.REDIS_HOST);
 
 /**
- * Helper to delete keys by pattern (e.g., "school:1:members:*")
- * Uses SCAN to avoid blocking the server.
+ * Create the Redis client.
+ * If no Redis configuration is provided, we return a lightweight stub so the
+ * rest of the app doesn't need to null-check everywhere.
  */
-redis.delByPattern = async (pattern) => {
-    let cursor = '0';
-    do {
-        const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-        cursor = nextCursor;
-        if (keys.length > 0) {
-            await redis.del(...keys);
-        }
-    } while (cursor !== '0');
-};
+let redis;
 
-module.exports = redis;
+if (hasRedisConfig) {
+    // Connection setup
+    // Support both REDIS_URL (common in cloud like Upstash) or host/port
+    const redisOptions = {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: process.env.REDIS_PORT || 6379,
+        password: process.env.REDIS_PASSWORD,
+        // Fail fast instead of retrying forever when Redis is unreachable
+        maxRetriesPerRequest: 3,
+        retryStrategy(times) {
+            if (times > 5) {
+                console.error('❌ Redis: max retries reached — giving up.');
+                return null; // stop retrying
+            }
+            return Math.min(times * 500, 3000); // back off up to 3 s
+        },
+        // Don't block startup waiting for Redis
+        lazyConnect: false,
+        enableOfflineQueue: false,
+    };
+
+    // If we are in production or using a cloud provider like Upstash,
+    // we likely need TLS. ioredis enables TLS if we provide the 'tls' object.
+    if (process.env.REDIS_URL && process.env.REDIS_URL.startsWith('rediss://')) {
+        // rediss:// protocol automatically enables TLS in ioredis
+    } else if (process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true') {
+        redisOptions.tls = {
+            rejectUnauthorized: false // Often needed for cloud providers
+        };
+    }
+
+    redis = process.env.REDIS_URL
+        ? new Redis(process.env.REDIS_URL, {
+              tls: process.env.REDIS_URL.startsWith('rediss://')
+                  ? { rejectUnauthorized: false }
+                  : undefined,
+              maxRetriesPerRequest: 3,
+              enableOfflineQueue: false,
+          })
+        : new Redis(redisOptions);
+
+    redis.on('connect', () => {
+        console.log('✅ Connected to Redis successfully');
+    });
+
+    redis.on('error', (err) => {
+        console.error('❌ Redis connection error:', err.message);
+    });
+
+    /**
+     * Helper to delete keys by pattern (e.g., "school:1:members:*")
+     * Uses SCAN to avoid blocking the server.
+     */
+    redis.delByPattern = async (pattern) => {
+        let cursor = '0';
+        do {
+            const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+            cursor = nextCursor;
+            if (keys.length > 0) {
+                await redis.del(...keys);
+            }
+        } while (cursor !== '0');
+    };
+
+} else {
+    // No Redis configured — provide a safe stub
+    console.warn('⚠️ Redis not configured — rate limiting will use in-memory store');
+    redis = null;
+}
+
+module.exports = redis;

@@ -2,6 +2,27 @@ const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redis = require('../config/redis');
 
+/**
+ * Build a RedisStore if Redis is connected, otherwise return undefined
+ * so express-rate-limit falls back to its built-in MemoryStore.
+ */
+function createStore() {
+    try {
+        if (redis && typeof redis.call === 'function') {
+            return new RedisStore({
+                sendCommand: (...args) => redis.call(...args),
+            });
+        }
+    } catch (err) {
+        console.error('⚠️ Rate limiter: failed to create RedisStore:', err.message);
+    }
+
+    console.warn('⚠️ Rate limiter: using in-memory store (Redis unavailable)');
+    return undefined; // express-rate-limit defaults to MemoryStore
+}
+
+const store = createStore();
+
 // General Rate Limiter (500 requests per 15 minutes)
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -10,9 +31,7 @@ const globalLimiter = rateLimit({
     legacyHeaders: false,
     // Skip all login routes — they have their own dedicated authLimiter (5 mins)
     skip: (req) => req.method === 'POST' && /\/login(\/)?$/.test(req.originalUrl),
-    store: new RedisStore({
-        sendCommand: (...args) => redis.call(...args),
-    }),
+    ...(store && { store }),
     handler: (req, res, next, options) => {
         const retryAfter = res.getHeader('Retry-After') || Math.ceil(options.windowMs / 1000);
 
@@ -32,9 +51,7 @@ const authLimiter = rateLimit({
     max: 10, // Limit each IP to 10 requests per window
     standardHeaders: true,
     legacyHeaders: false,
-    store: new RedisStore({
-        sendCommand: (...args) => redis.call(...args),
-    }),
+    ...(store && { store }),
     handler: (req, res, next, options) => {
         res.status(options.statusCode).json({
             success: false,
