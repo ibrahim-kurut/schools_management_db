@@ -1,7 +1,8 @@
 const Redis = require('ioredis');
 
 // ── Determine whether Redis is explicitly configured ──
-const hasRedisConfig = !!(process.env.REDIS_URL || process.env.REDIS_HOST);
+const isTestEnv = process.env.NODE_ENV === 'test';
+const hasRedisConfig = !!(process.env.REDIS_URL || process.env.REDIS_HOST) && !isTestEnv;
 
 /**
  * Create the Redis client.
