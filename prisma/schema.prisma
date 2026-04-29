@@ -606,3 +606,19 @@ model PlatformReport {
   @@index([year, month])
   @@index([type])
 }
+
+model ContactMessage {
+  id           String   @id @default(uuid())
+  name         String
+  schoolName   String   @map("school_name")
+  phone        String
+  email        String
+  studentCount String   @map("student_count")
+  message      String?  @db.Text
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("contact_messages")
+}

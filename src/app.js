@@ -71,6 +71,8 @@ app.use('/api/admin/users', require('./routes/superAdminUserRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/notes', require('./routes/noteRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/contact-messages', require('./routes/contactMessageRoutes'));
+
 
 // Error Handler Middleware (Must be last)
 app.use(require('./middleware/errorHandler'));
