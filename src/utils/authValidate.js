@@ -14,9 +14,10 @@ const createUserSchema = Joi.object({
         'string.email': 'يرجى إدخال بريد إلكتروني صالح',
         'any.required': 'البريد الإلكتروني حقل إلزامي'
     }),
-    password: Joi.string().trim().min(6).required().messages({
+    password: Joi.string().trim().min(8).pattern(/[a-zA-Z]/).pattern(/[0-9]/).required().messages({
         'string.empty': 'كلمة المرور مطلوبة',
-        'string.min': 'كلمة المرور يجب ألا تقل عن 6 أحرف',
+        'string.min': 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+        'string.pattern.base': 'يجب أن تحتوي كلمة المرور على حروف وأرقام',
         'any.required': 'كلمة المرور حقل إلزامي'
     }),
     phone: Joi.string().trim().pattern(/^\d{10,11}$/).required().messages({
