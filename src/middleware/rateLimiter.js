@@ -5,23 +5,24 @@ const redis = require('../config/redis');
 /**
  * Build a RedisStore if Redis is connected, otherwise return undefined
  * so express-rate-limit falls back to its built-in MemoryStore.
+ * @param {string} prefix - Unique prefix for the rate limiter keys
  */
-function createStore() {
+function createStore(prefix) {
     try {
         if (redis && typeof redis.call === 'function') {
             return new RedisStore({
+                prefix: prefix,
+                // Send the command to Redis. If it fails, reject the promise.
                 sendCommand: (...args) => redis.call(...args),
             });
         }
     } catch (err) {
-        console.error('⚠️ Rate limiter: failed to create RedisStore:', err.message);
+        console.error(`⚠️ Rate limiter [${prefix}]: failed to create RedisStore:`, err.message);
     }
 
-    console.warn('⚠️ Rate limiter: using in-memory store (Redis unavailable)');
+    console.warn(`⚠️ Rate limiter [${prefix}]: using in-memory store (Redis unavailable)`);
     return undefined; // express-rate-limit defaults to MemoryStore
 }
-
-const store = createStore();
 
 // General Rate Limiter (500 requests per 15 minutes)
 const globalLimiter = rateLimit({
@@ -31,7 +32,8 @@ const globalLimiter = rateLimit({
     legacyHeaders: false,
     // Skip all login routes — they have their own dedicated authLimiter (5 mins)
     skip: (req) => req.method === 'POST' && /\/login(\/)?$/.test(req.originalUrl),
-    ...(store && { store }),
+    store: createStore('rl:global:'),
+    passOnStoreError: true, // Allow request to continue if Redis fails
     handler: (req, res, next, options) => {
         const retryAfter = res.getHeader('Retry-After') || Math.ceil(options.windowMs / 1000);
 
@@ -51,7 +53,8 @@ const authLimiter = rateLimit({
     max: 10, // Limit each IP to 10 requests per window
     standardHeaders: true,
     legacyHeaders: false,
-    ...(store && { store }),
+    store: createStore('rl:auth:'),
+    passOnStoreError: true, // Allow request to continue if Redis fails
     handler: (req, res, next, options) => {
         res.status(options.statusCode).json({
             success: false,

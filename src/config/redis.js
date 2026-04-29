@@ -76,8 +76,19 @@ if (hasRedisConfig) {
 
 } else {
     // No Redis configured — provide a safe stub
-    console.warn('⚠️ Redis not configured — rate limiting will use in-memory store');
-    redis = null;
+    console.warn('⚠️ Redis not configured — caching and rate limiting will use in-memory fallbacks or no-ops');
+    
+    // Create a dummy redis object so services don't crash when calling redis.get / redis.set
+    redis = {
+        status: 'end',
+        get: async () => null,
+        set: async () => 'OK',
+        del: async () => 0,
+        delByPattern: async () => {},
+        scan: async () => ['0', []],
+        call: undefined, // Rate limiter checks for typeof redis.call === 'function'
+        on: () => {}
+    };
 }
 
 module.exports = redis;
